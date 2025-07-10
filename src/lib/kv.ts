@@ -1,11 +1,11 @@
 ﻿import { Redis } from "@upstash/redis";
 import { APP_NAME } from "./constants";
 
-// 🔧 Replace with actual structure if you know it
+// Safe fallback type
 type FrameNotificationDetails = {
     message: string;
     timestamp: number;
-    [key: string]: any;
+    [key: string]: unknown;
 };
 
 // In-memory fallback storage
