@@ -1,7 +1,7 @@
 'use client';
 
 import dynamic from 'next/dynamic';
-import { useCallback, useState, type ComponentType } from 'react';
+import { useCallback, useState } from 'react';
 import { useMiniApp } from '@neynar/react';
 import { ShareButton } from '../Share';
 import { Button } from '../Button';
@@ -11,47 +11,23 @@ import { APP_URL } from '~/lib/constants';
 
 // Optional import for NeynarAuthButton - may not exist in all templates
 const NeynarAuthButton = dynamic(
-  () => {
-    return Promise.resolve().then(() => {
+  () =>
+    Promise.resolve().then(() => {
       try {
-        // @ts-ignore - NeynarAuthButton may not exist in all template variants
-        const module = eval('require("../NeynarAuthButton/index")');
-        return module.default || module.NeynarAuthButton;
-      } catch (error) {
-        // Return null component when module doesn't exist
+        // @ts-expect-error - NeynarAuthButton may not exist in all template variants
+        const mod = eval('require("../NeynarAuthButton/index")');
+        return mod.default || mod.NeynarAuthButton;
+      } catch {
         return () => null;
       }
-    });
-  },
+    }),
   { ssr: false }
 );
 
-
-/**
- * ActionsTab component handles mini app actions like sharing, notifications, and haptic feedback.
- *
- * This component provides the main interaction interface for users to:
- * - Share the mini app with others
- * - Sign in with Farcaster
- * - Send notifications to their account
- * - Trigger haptic feedback
- * - Add the mini app to their client
- * - Copy share URLs
- *
- * The component uses the useMiniApp hook to access Farcaster context and actions.
- * All state is managed locally within this component.
- *
- * @example
- * ```tsx
- * <ActionsTab />
- * ```
- */
 export function ActionsTab() {
-  // --- Hooks ---
   const { actions, added, notificationDetails, haptics, context } =
     useMiniApp();
 
-  // --- State ---
   const [notificationState, setNotificationState] = useState({
     sendStatus: '',
     shareUrlCopied: false,
@@ -59,21 +35,10 @@ export function ActionsTab() {
   const [selectedHapticIntensity, setSelectedHapticIntensity] =
     useState<Haptics.ImpactOccurredType>('medium');
 
-  // --- Handlers ---
-  /**
-   * Sends a notification to the current user's Farcaster account.
-   *
-   * This function makes a POST request to the /api/send-notification endpoint
-   * with the user's FID and notification details. It handles different response
-   * statuses including success (200), rate limiting (429), and errors.
-   *
-   * @returns Promise that resolves when the notification is sent or fails
-   */
   const sendFarcasterNotification = useCallback(async () => {
     setNotificationState((prev) => ({ ...prev, sendStatus: '' }));
-    if (!notificationDetails || !context) {
-      return;
-    }
+    if (!notificationDetails || !context) return;
+
     try {
       const response = await fetch('/api/send-notification', {
         method: 'POST',
@@ -84,35 +49,29 @@ export function ActionsTab() {
           notificationDetails,
         }),
       });
+
       if (response.status === 200) {
         setNotificationState((prev) => ({ ...prev, sendStatus: 'Success' }));
-        return;
       } else if (response.status === 429) {
         setNotificationState((prev) => ({
           ...prev,
           sendStatus: 'Rate limited',
         }));
-        return;
+      } else {
+        const responseText = await response.text();
+        setNotificationState((prev) => ({
+          ...prev,
+          sendStatus: `Error: ${responseText}`,
+        }));
       }
-      const responseText = await response.text();
+    } catch (err) {
       setNotificationState((prev) => ({
         ...prev,
-        sendStatus: `Error: ${responseText}`,
-      }));
-    } catch (error) {
-      setNotificationState((prev) => ({
-        ...prev,
-        sendStatus: `Error: ${error}`,
+        sendStatus: `Error: ${err}`,
       }));
     }
   }, [context, notificationDetails]);
 
-  /**
-   * Copies the share URL for the current user to the clipboard.
-   *
-   * This function generates a share URL using the user's FID and copies it
-   * to the clipboard. It shows a temporary "Copied!" message for 2 seconds.
-   */
   const copyUserShareUrl = useCallback(async () => {
     if (context?.user?.fid) {
       const userShareUrl = `${APP_URL}/share/${context.user.fid}`;
@@ -126,24 +85,16 @@ export function ActionsTab() {
     }
   }, [context?.user?.fid]);
 
-  /**
-   * Triggers haptic feedback with the selected intensity.
-   *
-   * This function calls the haptics.impactOccurred method with the current
-   * selectedHapticIntensity setting. It handles errors gracefully by logging them.
-   */
   const triggerHapticFeedback = useCallback(async () => {
     try {
       await haptics.impactOccurred(selectedHapticIntensity);
-    } catch (error) {
-      console.error('Haptic feedback failed:', error);
+    } catch (err) {
+      console.error('Haptic feedback failed:', err);
     }
   }, [haptics, selectedHapticIntensity]);
 
-  // --- Render ---
   return (
     <div className="space-y-3 px-6 w-full max-w-md mx-auto">
-      {/* Share functionality */}
       <ShareButton
         buttonText="Share Mini App"
         cast={{
@@ -154,13 +105,10 @@ export function ActionsTab() {
         className="w-full"
       />
 
-      {/* Authentication */}
       <SignIn />
 
-      {/* Neynar Authentication */}
       {NeynarAuthButton && <NeynarAuthButton />}
 
-      {/* Mini app actions */}
       <Button
         onClick={() =>
           actions.openUrl('https://www.youtube.com/watch?v=dQw4w9WgXcQ')
@@ -174,7 +122,6 @@ export function ActionsTab() {
         Add Mini App to Client
       </Button>
 
-      {/* Notification functionality */}
       {notificationState.sendStatus && (
         <div className="text-sm w-full">
           Send notification result: {notificationState.sendStatus}
@@ -188,7 +135,6 @@ export function ActionsTab() {
         Send notification
       </Button>
 
-      {/* Share URL copying */}
       <Button
         onClick={copyUserShareUrl}
         disabled={!context?.user?.fid}
@@ -197,7 +143,6 @@ export function ActionsTab() {
         {notificationState.shareUrlCopied ? 'Copied!' : 'Copy share URL'}
       </Button>
 
-      {/* Haptic feedback controls */}
       <div className="space-y-2">
         <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
           Haptic Intensity
@@ -211,11 +156,11 @@ export function ActionsTab() {
           }
           className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-primary"
         >
-          <option value={'light'}>Light</option>
-          <option value={'medium'}>Medium</option>
-          <option value={'heavy'}>Heavy</option>
-          <option value={'soft'}>Soft</option>
-          <option value={'rigid'}>Rigid</option>
+          <option value="light">Light</option>
+          <option value="medium">Medium</option>
+          <option value="heavy">Heavy</option>
+          <option value="soft">Soft</option>
+          <option value="rigid">Rigid</option>
         </select>
         <Button onClick={triggerHapticFeedback} className="w-full">
           Trigger Haptic Feedback
