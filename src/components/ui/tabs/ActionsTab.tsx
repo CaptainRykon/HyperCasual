@@ -14,7 +14,7 @@ const NeynarAuthButton = dynamic(
   () =>
     Promise.resolve().then(() => {
       try {
-        // @ts-expect-error - NeynarAuthButton may not exist in all template variants
+        
         const mod = eval('require("../NeynarAuthButton/index")');
         return mod.default || mod.NeynarAuthButton;
       } catch {

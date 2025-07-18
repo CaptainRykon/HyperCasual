@@ -32,9 +32,9 @@ export function Providers({
       () =>
         Promise.resolve().then(() => {
           try {
-            // @ts-expect-error - dynamic imports of optional modules
+           
             const nextAuth = eval('require("next-auth/react")');
-            // @ts-expect-error - dynamic imports of optional modules
+           
             const authKit = eval('require("@farcaster/auth-kit")');
 
             const WrappedComponent = ({ children }: { children: ReactNode }) => (
