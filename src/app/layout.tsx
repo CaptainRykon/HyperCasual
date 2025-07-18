@@ -22,7 +22,7 @@ export default async function RootLayout({
 
   if (shouldUseSession) {
     try {
-      // @ts-expect-error - module might not exist in all templates
+      
       const authModule = eval('require("~/auth")');
       session = await authModule.getSession();
     } catch {
