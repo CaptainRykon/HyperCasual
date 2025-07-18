@@ -1,6 +1,6 @@
 import React, { createContext, useEffect, useState } from "react";
 import dynamic from "next/dynamic";
-import { sdk } from '@farcaster/miniapp-sdk';
+import { sdk } from '@farcaster/frame-sdk';
 
 const FarcasterSolanaProvider = dynamic(
   () => import('@farcaster/mini-app-solana').then(mod => mod.FarcasterSolanaProvider),
