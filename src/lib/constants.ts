@@ -1,5 +1,3 @@
-import { type AccountAssociation } from '@farcaster/miniapp-node';
-
 /**
  * Application constants and configuration values.
  *
@@ -12,6 +10,7 @@ import { type AccountAssociation } from '@farcaster/miniapp-node';
  */
 
 // --- App Configuration ---
+
 /**
  * The base URL of the application.
  * Used for generating absolute URLs for assets and API endpoints.
@@ -43,6 +42,7 @@ export const APP_PRIMARY_CATEGORY = 'games';
 export const APP_TAGS = ['neynar', 'starter-kit', 'demo'];
 
 // --- Asset URLs ---
+
 /**
  * URL for the app's icon image.
  * Used in app store listings and UI elements.
@@ -71,10 +71,13 @@ export const APP_SPLASH_BACKGROUND_COLOR: string = "#f7f7f7";
  * Account association for the mini app.
  * Used to associate the mini app with a Farcaster account.
  * If not provided, the mini app will be unsigned and have limited capabilities.
+ *
+ * NOTE: Define your own type if needed.
  */
-export const APP_ACCOUNT_ASSOCIATION: AccountAssociation | undefined = undefined;
+export const APP_ACCOUNT_ASSOCIATION: undefined = undefined;
 
 // --- UI Configuration ---
+
 /**
  * Text displayed on the main action button.
  * Used for the primary call-to-action in the mini app.
@@ -82,6 +85,7 @@ export const APP_ACCOUNT_ASSOCIATION: AccountAssociation | undefined = undefined
 export const APP_BUTTON_TEXT = 'Play Game';
 
 // --- Integration Configuration ---
+
 /**
  * Webhook URL for receiving events from Neynar.
  *
@@ -89,7 +93,8 @@ export const APP_BUTTON_TEXT = 'Play Game';
  * Neynar webhook endpoint. Otherwise, falls back to a local webhook
  * endpoint for development and testing.
  */
-export const APP_WEBHOOK_URL: string = process.env.NEYNAR_API_KEY && process.env.NEYNAR_CLIENT_ID 
+export const APP_WEBHOOK_URL: string =
+  process.env.NEYNAR_API_KEY && process.env.NEYNAR_CLIENT_ID
     ? `https://api.neynar.com/f/app/${process.env.NEYNAR_CLIENT_ID}/event`
     : `${APP_URL}/api/webhook`;
 
@@ -117,7 +122,7 @@ export const ANALYTICS_ENABLED = false;
  * Contains an array of CAIP-2 identifiers for blockchains that the mini app requires.
  * If the host does not support all chains listed here, it will not render the mini app.
  * If empty or undefined, the mini app will be rendered regardless of chain support.
- * 
+ *
  * Supported chains: eip155:1, eip155:137, eip155:42161, eip155:10, eip155:8453,
  * solana:mainnet, solana:devnet
  */
