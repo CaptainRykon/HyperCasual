@@ -4,6 +4,7 @@ import dynamic from 'next/dynamic';
 import { MiniAppProvider } from '@neynar/react';
 import { SafeFarcasterSolanaProvider } from '~/components/providers/SafeFarcasterSolanaProvider';
 import { ANALYTICS_ENABLED } from '~/lib/constants';
+import { ReactNode } from 'react';
 
 const WagmiProvider = dynamic(
   () => import('~/components/providers/WagmiProvider'),
@@ -12,43 +13,46 @@ const WagmiProvider = dynamic(
   }
 );
 
-
+interface ProvidersProps {
+  session: unknown | null; // ✅ replaces `any`
+  children: ReactNode;
+  shouldUseSession?: boolean;
+}
 
 export function Providers({
   session,
   children,
   shouldUseSession = false,
-}: {
-  session: any | null;
-  children: React.ReactNode;
-  shouldUseSession?: boolean;
-}) {
+}: ProvidersProps) {
   const solanaEndpoint =
     process.env.SOLANA_RPC_ENDPOINT || 'https://solana-rpc.publicnode.com';
 
-  // Only wrap with SessionProvider if next auth is used
   if (shouldUseSession) {
-    // Dynamic import for auth components - will work if modules exist, fallback if not
-    const AuthWrapper = dynamic(
-      () => {
-        return Promise.resolve().then(() => {
-          // Use eval to avoid build-time module resolution
+    const AuthWrapper = dynamic<{ children: ReactNode }>(
+      () =>
+        Promise.resolve().then(() => {
           try {
-            // @ts-ignore - These modules may not exist in all template variants
+            // @ts-expect-error - dynamic imports of optional modules
             const nextAuth = eval('require("next-auth/react")');
+            // @ts-expect-error - dynamic imports of optional modules
             const authKit = eval('require("@farcaster/auth-kit")');
-            
-            return ({ children }: { children: React.ReactNode }) => (
+
+            const WrappedComponent = ({ children }: { children: ReactNode }) => (
               <nextAuth.SessionProvider session={session}>
-                <authKit.AuthKitProvider config={{}}>{children}</authKit.AuthKitProvider>
+                <authKit.AuthKitProvider config={{}}>
+                  {children}
+                </authKit.AuthKitProvider>
               </nextAuth.SessionProvider>
             );
-          } catch (error) {
-            // Fallback component when auth modules aren't available
-            return ({ children }: { children: React.ReactNode }) => <>{children}</>;
+
+            WrappedComponent.displayName = 'WrappedComponent'; // ✅ Fix for missing display name
+            return WrappedComponent;
+          } catch {
+            const Fallback = ({ children }: { children: ReactNode }) => <>{children}</>;
+            Fallback.displayName = 'AuthWrapperFallback'; // ✅ Fix for display name
+            return Fallback;
           }
-        });
-      },
+        }),
       { ssr: false }
     );
 
@@ -66,7 +70,6 @@ export function Providers({
     );
   }
 
-  // Return without SessionProvider if no session
   return (
     <WagmiProvider>
       <MiniAppProvider

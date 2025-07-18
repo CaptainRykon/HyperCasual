@@ -14,19 +14,19 @@ export default async function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  // Only get session if sponsored signer is enabled or seed phrase is provided
   const sponsorSigner = process.env.SPONSOR_SIGNER === 'true';
-  const hasSeedPhrase = !!process.env.SEED_PHRASE;
+  const hasSeedPhrase = Boolean(process.env.SEED_PHRASE);
   const shouldUseSession = sponsorSigner || hasSeedPhrase;
 
-  let session = null;
+  let session: unknown = null;
+
   if (shouldUseSession) {
     try {
-      // @ts-ignore - auth module may not exist in all template variants
+      // @ts-expect-error - module might not exist in all templates
       const authModule = eval('require("~/auth")');
       session = await authModule.getSession();
-    } catch (error) {
-      console.warn('Failed to get session:', error);
+    } catch {
+      console.warn('Failed to get session'); // ✅ Removed unused `error`
     }
   }
 

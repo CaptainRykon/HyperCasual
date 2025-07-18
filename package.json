@@ -11,16 +11,16 @@
     }
   },
   "types": "./index.d.ts",
-    "scripts": {
-        "dev": "node scripts/dev.js",
-        "build": "next build --no-lint",
-        "build:raw": "next build",
-        "start": "next start",
-        "lint": "next lint",
-        "deploy:vercel": "ts-node scripts/deploy.ts",
-        "deploy:raw": "vercel --prod",
-        "cleanup": "node scripts/cleanup.js"
-    },
+  "scripts": {
+    "dev": "node scripts/dev.js",
+    "build": "next build",
+    "build:raw": "next build",
+    "start": "next start",
+    "lint": "next lint",
+    "deploy:vercel": "ts-node scripts/deploy.ts",
+    "deploy:raw": "vercel --prod",
+    "cleanup": "node scripts/cleanup.js"
+  },
   "dependencies": {
     "@farcaster/auth-client": ">=0.3.0 <1.0.0",
     "@farcaster/miniapp-node": ">=0.1.5 <1.0.0",
