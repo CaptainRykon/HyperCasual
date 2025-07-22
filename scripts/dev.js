@@ -15,23 +15,6 @@ let tunnel;
 let nextDev;
 let isCleaningUp = false;
 
-// Parse command line arguments for port
-const args = process.argv.slice(2);
-let port = 3000; // default port
-
-// Look for --port=XXXX, --port XXXX, -p=XXXX, or -p XXXX
-args.forEach((arg, index) => {
-  if (arg.startsWith('--port=')) {
-    port = parseInt(arg.split('=')[1]);
-  } else if (arg === '--port' && args[index + 1]) {
-    port = parseInt(args[index + 1]);
-  } else if (arg.startsWith('-p=')) {
-    port = parseInt(arg.split('=')[1]);
-  } else if (arg === '-p' && args[index + 1]) {
-    port = parseInt(args[index + 1]);
-  }
-});
-
 async function checkPort(port) {
   return new Promise((resolve) => {
     const server = createServer();
@@ -84,12 +67,12 @@ async function killProcessOnPort(port) {
 }
 
 async function startDev() {
-  // Check if the specified port is already in use
-  const isPortInUse = await checkPort(port);
+  // Check if port 3000 is already in use
+  const isPortInUse = await checkPort(3000);
   if (isPortInUse) {
-    console.error(`Port ${port} is already in use. To find and kill the process using this port:\n\n` +
+    console.error('Port 3000 is already in use. To find and kill the process using this port:\n\n' +
       (process.platform === 'win32' 
-        ? `1. Run: netstat -ano | findstr :${port}\n` +
+        ? '1. Run: netstat -ano | findstr :3000\n' +
           '2. Note the PID (Process ID) from the output\n' +
           '3. Run: taskkill /PID <PID> /F\n'
         : `On macOS/Linux, run:\nnpm run cleanup\n`) +
@@ -102,7 +85,7 @@ async function startDev() {
 
   if (useTunnel) {
     // Start localtunnel and get URL
-    tunnel = await localtunnel({ port: port });
+    tunnel = await localtunnel({ port: 3000 });
     let ip;
     try {
       ip = await fetch('https://ipv4.icanhazip.com').then(res => res.text()).then(ip => ip.trim());
@@ -134,7 +117,7 @@ async function startDev() {
    5. Click "Preview" (note that it may take ~10 seconds to load)
 `);
   } else {
-    miniAppUrl = `http://localhost:${port}`;
+    miniAppUrl = 'http://localhost:3000';
     console.log(`
 💻 To test your mini app:
    1. Open the Warpcast Mini App Developer Tools: https://warpcast.com/~/developers
@@ -147,7 +130,7 @@ async function startDev() {
   // Start next dev with appropriate configuration
   const nextBin = path.normalize(path.join(projectRoot, 'node_modules', '.bin', 'next'));
 
-  nextDev = spawn(nextBin, ['dev', '-p', port.toString()], {
+  nextDev = spawn(nextBin, ['dev'], {
     stdio: 'inherit',
     env: { ...process.env, NEXT_PUBLIC_URL: miniAppUrl, NEXTAUTH_URL: miniAppUrl },
     cwd: projectRoot,
@@ -191,8 +174,8 @@ async function startDev() {
         }
       }
 
-      // Force kill any remaining processes on the specified port
-      await killProcessOnPort(port);
+      // Force kill any remaining processes on port 3000
+      await killProcessOnPort(3000);
     } catch (error) {
       console.error('Error during cleanup:', error);
     } finally {
