@@ -2,6 +2,7 @@
 
 import { useEffect, useRef } from "react";
 import sdk from "@farcaster/frame-sdk";
+import { ALLOWED_FIDS } from "../utils/AllowedFids"; // ✅ Corrected import path
 
 export default function App() {
     const iframeRef = useRef<HTMLIFrameElement>(null);
@@ -39,7 +40,7 @@ export default function App() {
                         "*"
                     );
 
-                    // Send FID separately to ensure it's available for notifications
+                    // Send FID separately
                     iframe.contentWindow.postMessage(
                         {
                             type: "UNITY_METHOD_CALL",
@@ -49,7 +50,18 @@ export default function App() {
                         "*"
                     );
 
-                    console.log("✅ Sent user info & FID to Unity:", userInfoRef.current);
+                    // ✅ Check if FID is allowed
+                    const isAllowed = ALLOWED_FIDS.includes(Number(fid));
+                    iframe.contentWindow.postMessage(
+                        {
+                            type: "UNITY_METHOD_CALL",
+                            method: "SetFidGateState", // Unity C# method must match this name
+                            args: [isAllowed ? "1" : "0"],
+                        },
+                        "*"
+                    );
+
+                    console.log("✅ Sent user info & gate status to Unity:", userInfoRef.current, { isAllowed });
                 };
 
                 const iframe = iframeRef.current;
