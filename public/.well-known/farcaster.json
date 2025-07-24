@@ -1,8 +1,4 @@
 
-
-
-
-
 {
     "accountAssociation": {
         "header": "eyJmaWQiOjEwMjAyNTEsInR5cGUiOiJjdXN0b2R5Iiwia2V5IjoiMHg5ZDZBMzk3RjA0Yjk1NDk2QTIwNzVDRDBkMUUyYTIyMkZCZTA2ZGE0In0",
@@ -18,6 +14,6 @@
         "buttonTitle": "Check this out",
         "splashImageUrl": "https://fargo-sable.vercel.app/splash.png",
         "splashBackgroundColor": "#eeccff",
-        "webhookUrl": "https://api.neynar.com/f/app/f7c1b4ba-f4b0-4e67-93ae-40a969c22652/event"
+        "webhookUrl": "https://api.neynar.com/f/app/86290aac-606b-45af-bf5f-016eb3facbc0/event"
     }
 }
