@@ -7,11 +7,11 @@
     },
     "frame": {
         "version": "1",
-        "name": "Example Frame",
+        "name": "FarGo",
         "iconUrl": "https://fargo-sable.vercel.app/icon.png",
         "homeUrl": "https://fargo-sable.vercel.app",
         "imageUrl": "https://fargo-sable.vercel.app/image.png",
-        "buttonTitle": "Check this out",
+        "buttonTitle": "Play Now",
         "splashImageUrl": "https://fargo-sable.vercel.app/splash.png",
         "splashBackgroundColor": "#eeccff",
         "webhookUrl": "https://api.neynar.com/f/app/86290aac-606b-45af-bf5f-016eb3facbc0/event"
