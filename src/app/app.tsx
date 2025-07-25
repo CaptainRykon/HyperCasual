@@ -67,7 +67,7 @@ export default function App() {
                                 await requestPayment({
                                     chainId: 8453, // Base Mainnet
                                     recipient: "0xE51f63637c549244d0A8E11ac7E6C86a1E9E0670", // Your wallet
-                                    amount: amount || "3.00",
+                                    amount: amount || "2.00",
                                     token: "USDC",
                                     onSuccess: () => {
                                         const iw = iframeRef.current?.contentWindow;
