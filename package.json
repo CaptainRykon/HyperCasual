@@ -27,6 +27,7 @@
     "@farcaster/frame-sdk": "^0.0.64",
     "@farcaster/frame-wagmi-connector": ">=0.0.19 <1.0.0",
     "@farcaster/mini-app-solana": ">=0.0.17 <1.0.0",
+    "@farcaster/miniapp-wagmi-connector": "^1.0.0",
     "@neynar/nodejs-sdk": "^2.19.0",
     "@neynar/react": "^1.2.5",
     "@radix-ui/react-label": "^2.1.1",
@@ -36,6 +37,7 @@
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "dotenv": "^16.4.7",
+    "ethers": "^6.15.0",
     "lucide-react": "^0.469.0",
     "mipd": "^0.0.7",
     "next": "^15",
@@ -46,6 +48,7 @@
     "tailwindcss-animate": "^1.0.7",
     "viem": "^2.23.6",
     "wagmi": "^2.14.12",
+    "web3": "^4.16.0",
     "zod": "^3.24.2"
   },
   "devDependencies": {

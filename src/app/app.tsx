@@ -3,6 +3,7 @@
 import { useEffect, useRef } from "react";
 import sdk from "@farcaster/frame-sdk";
 import { ALLOWED_FIDS } from "../utils/AllowedFids";
+import Web3 from "web3";
 
 export default function App() {
     const iframeRef = useRef<HTMLIFrameElement>(null);
@@ -77,7 +78,7 @@ export default function App() {
 
                 // 🔄 Listen for Unity-to-parent messages
                 window.addEventListener("message", async (event) => {
-                    const { type, action, message } = event.data || {};
+                    const { type, action, message, amount } = event.data || {};
                     if (type !== "frame-action") return;
 
                     switch (action) {
@@ -115,6 +116,11 @@ export default function App() {
                             }
                             break;
 
+                        case "request-payment":
+                            console.log("💸 Unity requested payment of", amount);
+                            await handleUSDCTransaction(amount || "2");
+                            break;
+
                         default:
                             console.warn("⚠️ Unknown message from Unity:", action);
                     }
@@ -123,6 +129,67 @@ export default function App() {
                 console.error("❌ Error initializing Farcaster bridge:", error);
             }
         };
+
+        // Send boolean back to Unity
+        const notifyUnityPaymentSuccess = () => {
+            const iframe = iframeRef.current;
+            if (!iframe?.contentWindow) return;
+            iframe.contentWindow.postMessage(
+                {
+                    type: "UNITY_METHOD_CALL",
+                    method: "SetPaymentSuccess",
+                    args: ["1"],
+                },
+                "*"
+            );
+            console.log("✅ Payment success sent to Unity!");
+        };
+
+        const handleUSDCTransaction = async (amount: string) => {
+            try {
+                if (!window.ethereum) {
+                    alert("No wallet found. Please install MetaMask.");
+                    return;
+                }
+
+                const web3 = new Web3(window.ethereum!);
+                await window.ethereum.request({ method: "eth_requestAccounts" });
+
+                const usdcContractAddress = "0xd9d5Fb1C1f04Ad2F25B4DbEc917F9E00793D66D4"; // ✅ Base USDC contract
+                const receiverAddress = "0xE51f63637c549244d0A8E11ac7E6C86a1E9E0670"; // ✅ Your wallet
+
+                const amountInWei = web3.utils.toWei(amount, "mwei"); // USDC uses 6 decimals
+
+                const tx = await window.ethereum.request({
+                    method: "eth_sendTransaction",
+                    params: [
+                        {
+                            from: (await web3.eth.getAccounts())[0],
+                            to: usdcContractAddress, // ✅ must be USDC contract
+                            value: "0x0",
+                            data: web3.eth.abi.encodeFunctionCall(
+                                {
+                                    name: "transfer",
+                                    type: "function",
+                                    inputs: [
+                                        { type: "address", name: "to" },
+                                        { type: "uint256", name: "value" },
+                                    ],
+                                },
+                                [receiverAddress, amountInWei]
+                            ),
+                        },
+                    ],
+                });
+
+                console.log("🔁 Payment TX:", tx);
+                notifyUnityPaymentSuccess(); // ✅ Notify Unity
+            } catch (err) {
+                console.error("❌ Payment failed", err);
+                alert("Payment failed. Try again.");
+            }
+        };
+
 
         initBridge();
     }, []);
