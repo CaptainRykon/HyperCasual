@@ -92,7 +92,7 @@
             document.querySelector(".loading-text").style.display = "none";
             console.log("✅ Unity WebGL initialized");
 
-            // Unity → parent
+            // Unity → Parent
             window.UnityShareGame = () =>
                 window.parent.postMessage({ type: "frame-action", action: "share-game" }, "*");
 
@@ -121,15 +121,19 @@
                 }
 
                 if (d?.type === "UNITY_METHOD_CALL") {
-                    if (d.method === "SetFarcasterFID") {
-                        instance.SendMessage("FarcasterBridge", "SetFarcasterFID", d.args?.[0] || "");
-                    } else if (d.method === "SetUserInList") {
-                        instance.SendMessage("FarcasterBridge", "SetUserInList", d.args?.[0] || "0");
+                    const method = d.method;
+                    const arg = d.args?.[0] || "0";
+
+                    if (method === "SetFarcasterFID") {
+                        instance.SendMessage("FarcasterBridge", "SetFarcasterFID", arg);
+                    } else if (method === "SetUserInList") {
+                        instance.SendMessage("FarcasterBridge", "SetUserInList", arg);
+                    } else if (method === "SetFidGateState") {
+                        instance.SendMessage("FarcasterBridge", "SetFidGateState", arg);
                     }
                 }
             });
-        })
-            .catch((err) => console.error("❌ Unity load failed:", err));
+        }).catch((err) => console.error("❌ Unity load failed:", err));
     </script>
 </body>
 </html>

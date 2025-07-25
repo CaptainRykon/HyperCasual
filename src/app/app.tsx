@@ -2,7 +2,7 @@
 
 import { useEffect, useRef } from "react";
 import sdk from "@farcaster/frame-sdk";
-import { ALLOWED_FIDS } from "../utils/AllowedFids"; // ✅ Corrected import path
+import { ALLOWED_FIDS } from "../utils/AllowedFids";
 
 export default function App() {
     const iframeRef = useRef<HTMLIFrameElement>(null);
@@ -31,7 +31,7 @@ export default function App() {
 
                     const { username, pfpUrl, fid } = userInfoRef.current;
 
-                    // Send user info
+                    // 👤 Send user info to Unity
                     iframe.contentWindow.postMessage(
                         {
                             type: "FARCASTER_USER_INFO",
@@ -40,7 +40,7 @@ export default function App() {
                         "*"
                     );
 
-                    // Send FID separately
+                    // 🆔 Send FID to Unity
                     iframe.contentWindow.postMessage(
                         {
                             type: "UNITY_METHOD_CALL",
@@ -50,23 +50,32 @@ export default function App() {
                         "*"
                     );
 
-                    // ✅ Check if FID is allowed
+                    // ✅ Check FID gate and send allowed status
                     const isAllowed = ALLOWED_FIDS.includes(Number(fid));
                     iframe.contentWindow.postMessage(
                         {
                             type: "UNITY_METHOD_CALL",
-                            method: "SetFidGateState", // Unity C# method must match this name
+                            method: "SetFidGateState",
                             args: [isAllowed ? "1" : "0"],
                         },
                         "*"
                     );
 
-                    console.log("✅ Sent user info & gate status to Unity:", userInfoRef.current, { isAllowed });
+                    console.log("✅ Posted user info & gate status to Unity:", {
+                        username,
+                        pfpUrl,
+                        fid,
+                        isAllowed,
+                    });
                 };
 
+                // ℹ️ Post info after iframe loads
                 const iframe = iframeRef.current;
-                if (iframe) iframe.addEventListener("load", postUserInfoToUnity);
+                if (iframe) {
+                    iframe.addEventListener("load", postUserInfoToUnity);
+                }
 
+                // 🔄 Listen for Unity-to-parent messages
                 window.addEventListener("message", async (event) => {
                     const { type, action, message } = event.data || {};
                     if (type !== "frame-action") return;
@@ -74,23 +83,23 @@ export default function App() {
                     switch (action) {
                         case "share-game":
                             sdk.actions.openUrl(
-                                `https://warpcast.com/~/compose?text=🎮 Try this awesome game!&embeds[]=https://webgl-bridge.vercel.app`
+                                `https://warpcast.com/~/compose?text=🎮 Try this awesome game!&embeds[]=https://fargo-sable.vercel.app/`
                             );
                             break;
 
                         case "share-score":
                             sdk.actions.openUrl(
-                                `https://warpcast.com/~/compose?text=🏆 I scored ${message} points! Can you beat me?&embeds[]=https://webgl-bridge.vercel.app`
+                                `https://warpcast.com/~/compose?text=🏆 I scored ${message} points! Can you beat me?&embeds[]=https://fargo-sable.vercel.app/`
                             );
                             break;
 
                         case "get-user-context":
-                            console.log("📨 Unity requested Farcaster user context");
+                            console.log("📨 Unity requested user context");
                             postUserInfoToUnity();
                             break;
 
                         case "send-notification":
-                            console.log("📬 Notification requested:", message);
+                            console.log("📬 Sending notification:", message);
                             if (userInfoRef.current.fid) {
                                 await fetch("/api/send-notification", {
                                     method: "POST",
@@ -102,16 +111,16 @@ export default function App() {
                                     }),
                                 });
                             } else {
-                                console.warn("❌ Cannot send notification, FID missing");
+                                console.warn("❌ Cannot notify, FID missing");
                             }
                             break;
 
                         default:
-                            console.warn("Unknown action from Unity:", action);
+                            console.warn("⚠️ Unknown message from Unity:", action);
                     }
                 });
             } catch (error) {
-                console.error("❌ Error setting up Farcaster bridge:", error);
+                console.error("❌ Error initializing Farcaster bridge:", error);
             }
         };
 
@@ -125,7 +134,7 @@ export default function App() {
                 src="/BridgeWebgl/index.html"
                 style={{ width: "100%", height: "100%", border: "none" }}
                 allowFullScreen
-            ></iframe>
+            />
         </div>
     );
 }
