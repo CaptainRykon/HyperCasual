@@ -32,35 +32,26 @@ export default function App() {
 
                     const { username, pfpUrl, fid } = userInfoRef.current;
 
-                    // 👤 Send user info to Unity
-                    iframe.contentWindow.postMessage(
-                        {
-                            type: "FARCASTER_USER_INFO",
-                            payload: { username, pfpUrl },
-                        },
-                        "*"
-                    );
+                    // Send user info
+                    iframe.contentWindow.postMessage({
+                        type: "FARCASTER_USER_INFO",
+                        payload: { username, pfpUrl },
+                    }, "*");
 
-                    // 🆔 Send FID to Unity
-                    iframe.contentWindow.postMessage(
-                        {
-                            type: "UNITY_METHOD_CALL",
-                            method: "SetFarcasterFID",
-                            args: [fid],
-                        },
-                        "*"
-                    );
+                    // Send FID
+                    iframe.contentWindow.postMessage({
+                        type: "UNITY_METHOD_CALL",
+                        method: "SetFarcasterFID",
+                        args: [fid],
+                    }, "*");
 
-                    // ✅ Check FID gate and send allowed status
+                    // FID Gate Check
                     const isAllowed = ALLOWED_FIDS.includes(Number(fid));
-                    iframe.contentWindow.postMessage(
-                        {
-                            type: "UNITY_METHOD_CALL",
-                            method: "SetFidGateState",
-                            args: [isAllowed ? "1" : "0"],
-                        },
-                        "*"
-                    );
+                    iframe.contentWindow.postMessage({
+                        type: "UNITY_METHOD_CALL",
+                        method: "SetFidGateState",
+                        args: [isAllowed ? "1" : "0"],
+                    }, "*");
 
                     console.log("✅ Posted user info & gate status to Unity:", {
                         username,
@@ -70,28 +61,21 @@ export default function App() {
                     });
                 };
 
-                // ℹ️ Post info after iframe loads
-                const iframe = iframeRef.current;
-                if (iframe) {
-                    iframe.addEventListener("load", postUserInfoToUnity);
+                if (iframeRef.current) {
+                    iframeRef.current.addEventListener("load", postUserInfoToUnity);
                 }
 
-                // 🔄 Listen for Unity-to-parent messages
                 window.addEventListener("message", async (event) => {
                     const { type, action, message, amount } = event.data || {};
                     if (type !== "frame-action") return;
 
                     switch (action) {
                         case "share-game":
-                            sdk.actions.openUrl(
-                                `https://warpcast.com/~/compose?text=🎮 Try this awesome game!&embeds[]=https://fargo-sable.vercel.app/`
-                            );
+                            sdk.actions.openUrl(`https://warpcast.com/~/compose?text=🎮 Try this awesome game!&embeds[]=https://fargo-sable.vercel.app/`);
                             break;
 
                         case "share-score":
-                            sdk.actions.openUrl(
-                                `https://warpcast.com/~/compose?text=🏆 I scored ${message} points! Can you beat me?&embeds[]=https://fargo-sable.vercel.app/`
-                            );
+                            sdk.actions.openUrl(`https://warpcast.com/~/compose?text=🏆 I scored ${message} points! Can you beat me?&embeds[]=https://fargo-sable.vercel.app/`);
                             break;
 
                         case "get-user-context":
@@ -118,7 +102,7 @@ export default function App() {
 
                         case "request-payment":
                             console.log("💸 Unity requested payment of", amount);
-                            await handleUSDCTransaction(amount || "2");
+                            await handleUSDCTransaction(amount || "3"); // default: 3 USDC
                             break;
 
                         default:
@@ -130,18 +114,16 @@ export default function App() {
             }
         };
 
-        // Send boolean back to Unity
         const notifyUnityPaymentSuccess = () => {
             const iframe = iframeRef.current;
             if (!iframe?.contentWindow) return;
-            iframe.contentWindow.postMessage(
-                {
-                    type: "UNITY_METHOD_CALL",
-                    method: "SetPaymentSuccess",
-                    args: ["1"],
-                },
-                "*"
-            );
+
+            iframe.contentWindow.postMessage({
+                type: "UNITY_METHOD_CALL",
+                method: "SetPaymentSuccess",
+                args: ["1"],
+            }, "*");
+
             console.log("✅ Payment success sent to Unity!");
         };
 
@@ -152,44 +134,48 @@ export default function App() {
                     return;
                 }
 
-                const web3 = new Web3(window.ethereum!);
+                const web3 = new Web3(window.ethereum);
                 await window.ethereum.request({ method: "eth_requestAccounts" });
 
-                const usdcContractAddress = "0xd9d5Fb1C1f04Ad2F25B4DbEc917F9E00793D66D4"; // ✅ Base USDC contract
-                const receiverAddress = "0xE51f63637c549244d0A8E11ac7E6C86a1E9E0670"; // ✅ Your wallet
+                const accounts = await web3.eth.getAccounts();
+                const from = accounts[0];
 
-                const amountInWei = web3.utils.toWei(amount, "mwei"); // USDC uses 6 decimals
+                const usdcContractAddress = "0xd9d5Fb1C1f04Ad2F25B4DbEc917F9E00793D66D4"; // Base USDC
+                const receiverAddress = "0xE51f63637c549244d0A8E11ac7E6C86a1E9E0670"; // ✅ YOUR wallet
+
+                const amountInWei = web3.utils.toWei(amount, "mwei"); // USDC = 6 decimals
+
+                const txData = web3.eth.abi.encodeFunctionCall(
+                    {
+                        name: "transfer",
+                        type: "function",
+                        inputs: [
+                            { type: "address", name: "to" },
+                            { type: "uint256", name: "value" },
+                        ],
+                    },
+                    [receiverAddress, amountInWei]
+                );
 
                 const tx = await window.ethereum.request({
                     method: "eth_sendTransaction",
                     params: [
                         {
-                            from: (await web3.eth.getAccounts())[0],
-                            to: usdcContractAddress, // ✅ must be USDC contract
+                            from,
+                            to: usdcContractAddress,
                             value: "0x0",
-                            data: web3.eth.abi.encodeFunctionCall(
-                                {
-                                    name: "transfer",
-                                    type: "function",
-                                    inputs: [
-                                        { type: "address", name: "to" },
-                                        { type: "uint256", name: "value" },
-                                    ],
-                                },
-                                [receiverAddress, amountInWei]
-                            ),
+                            data: txData,
                         },
                     ],
                 });
 
-                console.log("🔁 Payment TX:", tx);
-                notifyUnityPaymentSuccess(); // ✅ Notify Unity
+                console.log("🔁 Payment TX Hash:", tx);
+                notifyUnityPaymentSuccess();
             } catch (err) {
-                console.error("❌ Payment failed", err);
+                console.error("❌ Payment failed:", err);
                 alert("Payment failed. Try again.");
             }
         };
-
 
         initBridge();
     }, []);
