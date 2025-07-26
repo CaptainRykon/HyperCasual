@@ -3,7 +3,6 @@
 import { useEffect, useRef } from "react";
 import sdk from "@farcaster/frame-sdk";
 import { ALLOWED_FIDS } from "../utils/AllowedFids";
-import { requestPayment } from "@daimo/pay";
 
 type FarcasterUserInfo = {
     username: string;
@@ -77,10 +76,7 @@ export default function App() {
                         },
                     ];
 
-                    messages.forEach((msg) =>
-                        iw.postMessage(msg, "*")
-                    );
-
+                    messages.forEach((msg) => iw.postMessage(msg, "*"));
                     console.log("✅ Posted info to Unity →", { username, fid, isAllowed });
                 };
 
@@ -97,34 +93,33 @@ export default function App() {
 
                         case "request-payment":
                             console.log("💸 Unity requested payment:", amount);
-
                             try {
-                                await requestPayment({
-                                    chainId: 8453,
-                                    recipient: "0xE51f63637c549244d0A8E11ac7E6C86a1E9E0670",
-                                    amount: amount || "2.00",
-                                    token: "USDC",
-                                    onSuccess: () => {
-                                        const iw = iframeRef.current?.contentWindow;
-                                        if (!iw) return;
-                                        iw.postMessage(
-                                            {
-                                                type: "UNITY_METHOD_CALL",
-                                                method: "SetPaymentSuccess",
-                                                args: ["1"],
-                                            },
-                                            "*"
-                                        );
-                                        console.log("✅ Payment success sent to Unity");
-                                    },
-                                    onError: (err) => {
-                                        console.error("❌ Payment failed:", err);
-                                    },
-                                });
-                            } catch (err) {
-                                console.error("❌ Error during payment flow:", err);
-                            }
+                                const { fid } = userInfoRef.current;
 
+                                const result = await sdk.actions.sendToken({
+                                    token: "eip155:8453/erc20:0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913", // USDC on Base
+                                    amount: "2000000", // 2 USDC (6 decimals)
+                                    recipientFid: Number(fid),
+                                    recipientAddress: "0xE51f63637c549244d0A8E11ac7E6C86a1E9E0670", // Your wallet
+                                });
+
+                                if (result.success) {
+                                    console.log("✅ Payment complete, tx:", result.send.transaction);
+                                    const iw = iframeRef.current?.contentWindow;
+                                    iw?.postMessage(
+                                        {
+                                            type: "UNITY_METHOD_CALL",
+                                            method: "SetPaymentSuccess",
+                                            args: ["1"],
+                                        },
+                                        "*"
+                                    );
+                                } else {
+                                    console.error("❌ Payment failed:", result.reason, result.error?.message);
+                                }
+                            } catch (err) {
+                                console.error("❌ Error during payment:", err);
+                            }
                             break;
                     }
                 });
