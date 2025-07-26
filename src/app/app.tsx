@@ -5,9 +5,39 @@ import sdk from "@farcaster/frame-sdk";
 import { ALLOWED_FIDS } from "../utils/AllowedFids";
 import { requestPayment } from "@daimo/pay";
 
+type FarcasterUserInfo = {
+    username: string;
+    pfpUrl: string;
+    fid: string;
+};
+
+type UnityMessage =
+    | {
+        type: "FARCASTER_USER_INFO";
+        payload: {
+            username: string;
+            pfpUrl: string;
+        };
+    }
+    | {
+        type: "UNITY_METHOD_CALL";
+        method: string;
+        args: string[];
+    };
+
+type FrameActionMessage = {
+    type: "frame-action";
+    action: "get-user-context" | "request-payment";
+    amount?: string;
+};
+
 export default function App() {
     const iframeRef = useRef<HTMLIFrameElement>(null);
-    const userInfoRef = useRef({ username: "Guest", pfpUrl: "", fid: "" });
+    const userInfoRef = useRef<FarcasterUserInfo>({
+        username: "Guest",
+        pfpUrl: "",
+        fid: "",
+    });
 
     useEffect(() => {
         const init = async () => {
@@ -28,30 +58,35 @@ export default function App() {
 
                     const { username, pfpUrl, fid } = userInfoRef.current;
 
-                    iw.postMessage({
-                        type: "FARCASTER_USER_INFO",
-                        payload: { username, pfpUrl },
-                    }, "*");
-
-                    iw.postMessage({
-                        type: "UNITY_METHOD_CALL",
-                        method: "SetFarcasterFID",
-                        args: [fid],
-                    }, "*");
-
                     const isAllowed = ALLOWED_FIDS.includes(Number(fid));
-                    iw.postMessage({
-                        type: "UNITY_METHOD_CALL",
-                        method: "SetFidGateState",
-                        args: [isAllowed ? "1" : "0"],
-                    }, "*");
+
+                    const messages: UnityMessage[] = [
+                        {
+                            type: "FARCASTER_USER_INFO",
+                            payload: { username, pfpUrl },
+                        },
+                        {
+                            type: "UNITY_METHOD_CALL",
+                            method: "SetFarcasterFID",
+                            args: [fid],
+                        },
+                        {
+                            type: "UNITY_METHOD_CALL",
+                            method: "SetFidGateState",
+                            args: [isAllowed ? "1" : "0"],
+                        },
+                    ];
+
+                    messages.forEach((msg) =>
+                        iw.postMessage(msg, "*")
+                    );
 
                     console.log("✅ Posted info to Unity →", { username, fid, isAllowed });
                 };
 
                 iframeRef.current?.addEventListener("load", postToUnity);
 
-                window.addEventListener("message", async (event) => {
+                window.addEventListener("message", async (event: MessageEvent<FrameActionMessage>) => {
                     const { type, action, amount } = event.data || {};
                     if (type !== "frame-action") return;
 
@@ -65,18 +100,21 @@ export default function App() {
 
                             try {
                                 await requestPayment({
-                                    chainId: 8453, // Base Mainnet
-                                    recipient: "0xE51f63637c549244d0A8E11ac7E6C86a1E9E0670", // Your wallet
+                                    chainId: 8453,
+                                    recipient: "0xE51f63637c549244d0A8E11ac7E6C86a1E9E0670",
                                     amount: amount || "2.00",
                                     token: "USDC",
                                     onSuccess: () => {
                                         const iw = iframeRef.current?.contentWindow;
                                         if (!iw) return;
-                                        iw.postMessage({
-                                            type: "UNITY_METHOD_CALL",
-                                            method: "SetPaymentSuccess",
-                                            args: ["1"],
-                                        }, "*");
+                                        iw.postMessage(
+                                            {
+                                                type: "UNITY_METHOD_CALL",
+                                                method: "SetPaymentSuccess",
+                                                args: ["1"],
+                                            },
+                                            "*"
+                                        );
                                         console.log("✅ Payment success sent to Unity");
                                     },
                                     onError: (err) => {
@@ -88,8 +126,6 @@ export default function App() {
                             }
 
                             break;
-
-                        // You can add more frame-actions here
                     }
                 });
             } catch (err) {
