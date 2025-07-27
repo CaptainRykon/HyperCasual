@@ -56,7 +56,6 @@ export default function App() {
                     if (!iw) return;
 
                     const { username, pfpUrl, fid } = userInfoRef.current;
-
                     const isAllowed = ALLOWED_FIDS.includes(Number(fid));
 
                     const messages: UnityMessage[] = [
@@ -82,29 +81,44 @@ export default function App() {
 
                 iframeRef.current?.addEventListener("load", postToUnity);
 
-                window.addEventListener("message", async (event: MessageEvent<FrameActionMessage>) => {
-                    const { type, action, amount } = event.data || {};
-                    if (type !== "frame-action") return;
+                window.addEventListener(
+                    "message",
+                    async (event: MessageEvent<FrameActionMessage>) => {
+                        const { type, action } = event.data || {};
+                        if (type !== "frame-action") return;
 
-                    switch (action) {
-                        case "get-user-context":
-                            postToUnity();
-                            break;
+                        switch (action) {
+                            case "get-user-context":
+                                postToUnity();
+                                break;
 
-                        case "request-payment":
-                            console.log("💸 Unity requested payment:", amount);
-                            try {
-                                const { fid } = userInfoRef.current;
+                            case "request-payment":
+                                console.log("💸 Unity requested payment");
 
-                                const result = await sdk.actions.sendToken({
-                                    token: "eip155:8453/erc20:0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913", // USDC on Base
-                                    amount: "2000000", // 2 USDC (6 decimals)
-                                    recipientFid: Number(fid),
-                                    recipientAddress: "0xE51f63637c549244d0A8E11ac7E6C86a1E9E0670", // Your wallet
-                                });
+                                try {
+                                    const { fid } = userInfoRef.current;
 
-                                if (result.success) {
-                                    console.log("✅ Payment complete, tx:", result.send.transaction);
+                                    const result = await sdk.actions.sendToken({
+                                        token: "eip155:8453/erc20:0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913", // USDC on Base
+                                        amount: "2000000", // 2 USDC
+                                        recipientFid: Number(fid),
+                                        recipientAddress: "0xE51f63637c549244d0A8E11ac7E6C86a1E9E0670",
+                                    });
+
+                                    if (!result.success) {
+                                        console.error("❌ Payment failed:", result.reason, result.error?.message);
+                                        return;
+                                    }
+
+                                    const txHash = result.send.transaction;
+                                    console.log("✅ Payment complete, tx hash:", txHash);
+
+                                    const verified = await verifyTransactionOnChain(txHash);
+                                    if (!verified) {
+                                        console.warn("❌ On-chain payment verification failed");
+                                        return;
+                                    }
+
                                     const iw = iframeRef.current?.contentWindow;
                                     iw?.postMessage(
                                         {
@@ -114,15 +128,14 @@ export default function App() {
                                         },
                                         "*"
                                     );
-                                } else {
-                                    console.error("❌ Payment failed:", result.reason, result.error?.message);
+                                } catch (err) {
+                                    console.error("❌ Error during payment:", err);
                                 }
-                            } catch (err) {
-                                console.error("❌ Error during payment:", err);
-                            }
-                            break;
+
+                                break;
+                        }
                     }
-                });
+                );
             } catch (err) {
                 console.error("❌ Error initializing bridge:", err);
             }
@@ -130,6 +143,35 @@ export default function App() {
 
         init();
     }, []);
+
+    // ✅ Add this function outside useEffect
+    const verifyTransactionOnChain = async (txHash: string): Promise<boolean> => {
+        const apiKey = "BKJBIPAMJXASHTS9TAV1T5MNI6CV1BWUZT"; // 🔐 Replace with real key
+        const url = `https://api.basescan.org/api?module=account&action=tokentx&txhash=${txHash}&apikey=${apiKey}`;
+
+        try {
+            const res = await fetch(url);
+            const data = await res.json();
+
+            if (data.status !== "1" || !data.result || data.result.length === 0) {
+                return false;
+            }
+
+            const tx = data.result[0];
+            const expectedToken = "0x833589fcd6edb6e08f4c7c32d4f71b54bda02913";
+            const expectedRecipient = "0xe51f63637c549244d0a8e11ac7e6c86a1e9e0670";
+            const expectedAmount = "2000000"; // 2 USDC (6 decimals)
+
+            return (
+                tx.contractAddress.toLowerCase() === expectedToken &&
+                tx.to.toLowerCase() === expectedRecipient &&
+                tx.value === expectedAmount
+            );
+        } catch (err) {
+            console.error("❌ Error verifying transaction:", err);
+            return false;
+        }
+    };
 
     return (
         <div style={{ width: "100vw", height: "100vh", overflow: "hidden" }}>
