@@ -3,6 +3,7 @@
 import { useEffect, useRef } from "react";
 import sdk from "@farcaster/frame-sdk";
 import { ALLOWED_FIDS } from "../utils/AllowedFids";
+import { verifyTransaction } from "../utils/verifyTransaction"; // ✅ Import your new verification function
 
 type FarcasterUserInfo = {
     username: string;
@@ -113,7 +114,7 @@ export default function App() {
                                     const txHash = result.send.transaction;
                                     console.log("✅ Payment complete, tx hash:", txHash);
 
-                                    const verified = await verifyTransactionOnChain(txHash);
+                                    const verified = await verifyTransaction(txHash); // ✅ Using the new utility
                                     if (!verified) {
                                         console.warn("❌ On-chain payment verification failed");
                                         return;
@@ -143,46 +144,6 @@ export default function App() {
 
         init();
     }, []);
-
-    // ✅ Improved version with full debugging and error-proof matching
-    const verifyTransactionOnChain = async (txHash: string): Promise<boolean> => {
-        const apiKey = "BKJBIPAMJXASHTS9TAV1T5MNI6CV1BWUZT"; // Replace with your actual API key
-        const url = `https://api.basescan.org/api?module=account&action=tokentx&txhash=${txHash}&apikey=${apiKey}`;
-
-        try {
-            const res = await fetch(url);
-            const data = await res.json();
-
-            if (data.status !== "1" || !data.result || data.result.length === 0) {
-                console.warn("⚠️ Transaction not found or no token transfer");
-                return false;
-            }
-
-            const tx = data.result[0];
-            console.log("🔍 TX from Basescan:", tx);
-
-            const expectedToken = "0x833589fcd6edb6e08f4c7c32d4f71b54bda02913"; // USDC
-            const expectedRecipient = "0xe51f63637c549244d0a8e11ac7e6c86a1e9e0670"; // Your address
-            const expectedAmount = "2000000"; // 2 USDC (6 decimals)
-
-            const matches =
-                tx.contractAddress?.toLowerCase() === expectedToken &&
-                tx.to?.toLowerCase() === expectedRecipient &&
-                tx.value === expectedAmount;
-
-            console.log("✅ Verifying values:", {
-                actualContract: tx.contractAddress,
-                actualTo: tx.to,
-                actualAmount: tx.value,
-                matches,
-            });
-
-            return matches;
-        } catch (err) {
-            console.error("❌ Error verifying transaction:", err);
-            return false;
-        }
-    };
 
     return (
         <div style={{ width: "100vw", height: "100vh", overflow: "hidden" }}>
