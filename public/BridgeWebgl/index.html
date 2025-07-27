@@ -130,6 +130,8 @@
                         instance.SendMessage("FarcasterBridge", "SetUserInList", arg);
                     } else if (method === "SetFidGateState") {
                         instance.SendMessage("FarcasterBridge", "SetFidGateState", arg);
+                    } else if (method === "SetPaymentSuccess") {
+                        instance.SendMessage("FarcasterBridge", "SetPaymentSuccess", arg);
                     }
                 }
             });
