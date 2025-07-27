@@ -144,9 +144,9 @@ export default function App() {
         init();
     }, []);
 
-    // ✅ Add this function outside useEffect
+    // ✅ Improved version with full debugging and error-proof matching
     const verifyTransactionOnChain = async (txHash: string): Promise<boolean> => {
-        const apiKey = "BKJBIPAMJXASHTS9TAV1T5MNI6CV1BWUZT"; // 🔐 Replace with real key
+        const apiKey = "BKJBIPAMJXASHTS9TAV1T5MNI6CV1BWUZT"; // Replace with your actual API key
         const url = `https://api.basescan.org/api?module=account&action=tokentx&txhash=${txHash}&apikey=${apiKey}`;
 
         try {
@@ -154,19 +154,30 @@ export default function App() {
             const data = await res.json();
 
             if (data.status !== "1" || !data.result || data.result.length === 0) {
+                console.warn("⚠️ Transaction not found or no token transfer");
                 return false;
             }
 
             const tx = data.result[0];
-            const expectedToken = "0x833589fcd6edb6e08f4c7c32d4f71b54bda02913";
-            const expectedRecipient = "0xe51f63637c549244d0a8e11ac7e6c86a1e9e0670";
+            console.log("🔍 TX from Basescan:", tx);
+
+            const expectedToken = "0x833589fcd6edb6e08f4c7c32d4f71b54bda02913"; // USDC
+            const expectedRecipient = "0xe51f63637c549244d0a8e11ac7e6c86a1e9e0670"; // Your address
             const expectedAmount = "2000000"; // 2 USDC (6 decimals)
 
-            return (
-                tx.contractAddress.toLowerCase() === expectedToken &&
-                tx.to.toLowerCase() === expectedRecipient &&
-                tx.value === expectedAmount
-            );
+            const matches =
+                tx.contractAddress?.toLowerCase() === expectedToken &&
+                tx.to?.toLowerCase() === expectedRecipient &&
+                tx.value === expectedAmount;
+
+            console.log("✅ Verifying values:", {
+                actualContract: tx.contractAddress,
+                actualTo: tx.to,
+                actualAmount: tx.value,
+                matches,
+            });
+
+            return matches;
         } catch (err) {
             console.error("❌ Error verifying transaction:", err);
             return false;
