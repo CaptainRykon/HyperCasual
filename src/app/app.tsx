@@ -92,7 +92,7 @@ export default function App() {
 
                 iframeRef.current?.addEventListener("load", postToUnity);
 
-                // Unity -> React
+                // Handle Unity -> React bridge messages
                 window.addEventListener(
                     "message",
                     async (event: MessageEvent<FrameActionMessage>) => {
@@ -112,8 +112,8 @@ export default function App() {
                                     return;
                                 }
 
-                                const recipient = "0xE51f63637c549244d0A8E11ac7E6C86a1E9E0670";
-                                const usdcContract = "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913";
+                                const recipient = "0xE51f63637c549244d0A8E11ac7E6C86a1E9E0670"; // Replace with your address
+                                const usdcContract = "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913"; // USDC on Base
 
                                 const data = encodeFunctionData({
                                     abi: [
@@ -137,9 +137,10 @@ export default function App() {
                                         to: usdcContract,
                                         data,
                                         value: 0n,
+                                        account: address!,
                                     });
 
-                                    console.log("⏳ Waiting for transaction:", txHash);
+                                    console.log("⏳ Payment transaction sent:", txHash);
 
                                     iframeRef.current?.contentWindow?.postMessage(
                                         { type: "PaymentSuccess" },
@@ -156,7 +157,7 @@ export default function App() {
                     }
                 );
 
-                // Optional: Listen to Frame Wallet confirmation
+                // Frame Wallet → React: Optional confirmation
                 window.addEventListener(
                     "message",
                     (event: MessageEvent<FrameTransactionMessage>) => {
@@ -170,7 +171,7 @@ export default function App() {
                     }
                 );
             } catch (err) {
-                console.error("❌ Error initializing bridge:", err);
+                console.error("❌ Error initializing Farcaster + Unity bridge:", err);
             }
         };
 
