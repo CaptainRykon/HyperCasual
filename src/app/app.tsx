@@ -2,8 +2,11 @@
 
 import { useEffect, useRef } from "react";
 import sdk from "@farcaster/frame-sdk";
-import { parseUnits, Interface } from "ethers";
 import { ALLOWED_FIDS } from "../utils/AllowedFids";
+import { parseUnits } from "ethers";
+import { createWalletClient, custom, encodeFunctionData } from "viem";
+import { base } from "viem/chains";
+import { useAccount } from "wagmi";
 
 type FarcasterUserInfo = {
     username: string;
@@ -42,6 +45,8 @@ export default function App() {
         pfpUrl: "",
         fid: "",
     });
+
+    const { address } = useAccount();
 
     useEffect(() => {
         const init = async () => {
@@ -87,10 +92,10 @@ export default function App() {
 
                 iframeRef.current?.addEventListener("load", postToUnity);
 
-                // Handle Unity -> React bridge messages
+                // Unity -> React
                 window.addEventListener(
                     "message",
-                    (event: MessageEvent<FrameActionMessage>) => {
+                    async (event: MessageEvent<FrameActionMessage>) => {
                         const { type, action } = event.data || {};
                         if (type !== "frame-action") return;
 
@@ -102,39 +107,57 @@ export default function App() {
                             case "request-payment":
                                 console.log("💸 Unity requested locked 2 USDC payment");
 
-                                const recipient = "0xE51f63637c549244d0A8E11ac7E6C86a1E9E0670"; // Your address
-                                const usdcContract = "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913"; // USDC on Base
+                                const recipient = "0xE51f63637c549244d0A8E11ac7E6C86a1E9E0670";
+                                const usdcContract = "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913";
 
-                                const iface = new Interface([
-                                    "function transfer(address to, uint256 amount)",
-                                ]);
+                                const data = encodeFunctionData({
+                                    abi: [
+                                        {
+                                            name: "transfer",
+                                            type: "function",
+                                            stateMutability: "nonpayable",
+                                            inputs: [
+                                                { name: "to", type: "address" },
+                                                { name: "amount", type: "uint256" },
+                                            ],
+                                            outputs: [{ name: "", type: "bool" }],
+                                        },
+                                    ],
+                                    functionName: "transfer",
+                                    args: [recipient, parseUnits("2", 6)],
+                                });
 
-                                const amount = parseUnits("2", 6); // 2 USDC
-                                const data = iface.encodeFunctionData("transfer", [recipient, amount]);
+                                const client = createWalletClient({
+                                    chain: base,
+                                    transport: custom((window).ethereum),
+                                });
 
-                                const paymentRequest = {
-                                    type: "farcaster:request-payment",
-                                    data: {
-                                        chainId: "eip155:8453", // Base Mainnet
-                                        method: "eth_sendTransaction",
-                                        params: [
-                                            {
-                                                to: usdcContract,
-                                                data,
-                                                value: "0x0",
-                                            },
-                                        ],
-                                    },
-                                };
+                                try {
+                                    const txHash = await client.sendTransaction({
+                                        to: usdcContract,
+                                        data,
+                                        value: 0n,
+                                        account: address!,
+                                    });
 
-                                window.parent.postMessage(paymentRequest, "*");
-                                console.log("📤 Sent locked payment popup to Frame Wallet");
+                                    console.log("⏳ Waiting for transaction:", txHash);
+
+                                    iframeRef.current?.contentWindow?.postMessage(
+                                        { type: "PaymentSuccess" },
+                                        "*"
+                                    );
+
+                                    console.log("✅ Payment success sent to Unity");
+                                } catch (err) {
+                                    console.error("❌ Payment failed:", err);
+                                }
+
                                 break;
                         }
                     }
                 );
 
-                // Frame Wallet → React: Payment confirmation
+                // Optional: Listen to Frame Wallet confirmation
                 window.addEventListener(
                     "message",
                     (event: MessageEvent<FrameTransactionMessage>) => {
@@ -153,7 +176,7 @@ export default function App() {
         };
 
         init();
-    }, []);
+    }, [address]);
 
     return (
         <div style={{ width: "100vw", height: "100vh", overflow: "hidden" }}>
