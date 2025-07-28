@@ -4,9 +4,8 @@ import { useEffect, useRef } from "react";
 import sdk from "@farcaster/frame-sdk";
 import { ALLOWED_FIDS } from "../utils/AllowedFids";
 import { parseUnits } from "ethers";
-import { createWalletClient, custom, encodeFunctionData } from "viem";
-import { base } from "viem/chains";
-import { useAccount } from "wagmi";
+import { encodeFunctionData } from "viem";
+import { useAccount, useWalletClient } from "wagmi";
 
 type FarcasterUserInfo = {
     username: string;
@@ -47,6 +46,7 @@ export default function App() {
     });
 
     const { address } = useAccount();
+    const { data: walletClient } = useWalletClient();
 
     useEffect(() => {
         const init = async () => {
@@ -107,6 +107,11 @@ export default function App() {
                             case "request-payment":
                                 console.log("💸 Unity requested locked 2 USDC payment");
 
+                                if (!walletClient) {
+                                    console.error("❌ No wallet client available");
+                                    return;
+                                }
+
                                 const recipient = "0xE51f63637c549244d0A8E11ac7E6C86a1E9E0670";
                                 const usdcContract = "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913";
 
@@ -127,17 +132,11 @@ export default function App() {
                                     args: [recipient, parseUnits("2", 6)],
                                 });
 
-                                const client = createWalletClient({
-                                    chain: base,
-                                    transport: custom((window).ethereum),
-                                });
-
                                 try {
-                                    const txHash = await client.sendTransaction({
+                                    const txHash = await walletClient.sendTransaction({
                                         to: usdcContract,
                                         data,
                                         value: 0n,
-                                        account: address!,
                                     });
 
                                     console.log("⏳ Waiting for transaction:", txHash);
@@ -176,7 +175,7 @@ export default function App() {
         };
 
         init();
-    }, [address]);
+    }, [address, walletClient]);
 
     return (
         <div style={{ width: "100vw", height: "100vh", overflow: "hidden" }}>
