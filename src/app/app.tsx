@@ -3,7 +3,7 @@
 import { useEffect, useRef } from "react";
 import sdk from "@farcaster/frame-sdk";
 import { ALLOWED_FIDS } from "../utils/AllowedFids";
-import { parseUnits } from "ethers";
+import { parseUnits } from "ethers"; // FIX: Correct utils import
 import { encodeFunctionData } from "viem";
 import { useAccount, useWalletClient } from "wagmi";
 
@@ -92,86 +92,79 @@ export default function App() {
 
                 iframeRef.current?.addEventListener("load", postToUnity);
 
-                // Handle Unity -> React bridge messages
-                window.addEventListener(
-                    "message",
-                    async (event: MessageEvent<FrameActionMessage>) => {
-                        const { type, action } = event.data || {};
-                        if (type !== "frame-action") return;
+                // Unity -> React
+                window.addEventListener("message", async (event: MessageEvent<FrameActionMessage>) => {
+                    const { type, action } = event.data || {};
+                    if (type !== "frame-action") return;
 
-                        switch (action) {
-                            case "get-user-context":
-                                postToUnity();
-                                break;
+                    switch (action) {
+                        case "get-user-context":
+                            postToUnity();
+                            break;
 
-                            case "request-payment":
-                                console.log("💸 Unity requested locked 2 USDC payment");
+                        case "request-payment":
+                            console.log("💸 Unity requested locked 2 USDC payment");
 
-                                if (!walletClient) {
-                                    console.error("❌ No wallet client available");
-                                    return;
-                                }
+                            if (!walletClient) {
+                                console.error("❌ No wallet client available");
+                                return;
+                            }
 
-                                const recipient = "0xE51f63637c549244d0A8E11ac7E6C86a1E9E0670"; // Replace with your address
-                                const usdcContract = "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913"; // USDC on Base
+                            const recipient = "0xE51f63637c549244d0A8E11ac7E6C86a1E9E0670";
+                            const usdcContract = "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913";
 
-                                const data = encodeFunctionData({
-                                    abi: [
-                                        {
-                                            name: "transfer",
-                                            type: "function",
-                                            stateMutability: "nonpayable",
-                                            inputs: [
-                                                { name: "to", type: "address" },
-                                                { name: "amount", type: "uint256" },
-                                            ],
-                                            outputs: [{ name: "", type: "bool" }],
-                                        },
-                                    ],
-                                    functionName: "transfer",
-                                    args: [recipient, parseUnits("2", 6)],
+                            const data = encodeFunctionData({
+                                abi: [
+                                    {
+                                        name: "transfer",
+                                        type: "function",
+                                        stateMutability: "nonpayable",
+                                        inputs: [
+                                            { name: "to", type: "address" },
+                                            { name: "amount", type: "uint256" },
+                                        ],
+                                        outputs: [{ name: "", type: "bool" }],
+                                    },
+                                ],
+                                functionName: "transfer",
+                                args: [recipient, parseUnits("2", 6)],
+                            });
+
+                            try {
+                                const txHash = await walletClient.sendTransaction({
+                                    to: usdcContract,
+                                    data,
+                                    value: 0n,
                                 });
 
-                                try {
-                                    const txHash = await walletClient.sendTransaction({
-                                        to: usdcContract,
-                                        data,
-                                        value: 0n,
-                                        account: address!,
-                                    });
+                                console.log("⏳ Payment transaction sent:", txHash);
 
-                                    console.log("⏳ Payment transaction sent:", txHash);
+                                iframeRef.current?.contentWindow?.postMessage(
+                                    {
+                                        type: "UNITY_METHOD_CALL",
+                                        method: "SetPaymentSuccess",
+                                        args: ["1"], // 💥 THIS is what Unity expects
+                                    },
+                                    "*"
+                                );
 
-                                    iframeRef.current?.contentWindow?.postMessage(
-                                        { type: "PaymentSuccess" },
-                                        "*"
-                                    );
+                                console.log("✅ Payment success sent to Unity");
+                            } catch (err) {
+                                console.error("❌ Payment failed:", err);
+                            }
 
-                                    console.log("✅ Payment success sent to Unity");
-                                } catch (err) {
-                                    console.error("❌ Payment failed:", err);
-                                }
-
-                                break;
-                        }
+                            break;
                     }
-                );
+                });
 
-                // Frame Wallet → React: Optional confirmation
-                window.addEventListener(
-                    "message",
-                    (event: MessageEvent<FrameTransactionMessage>) => {
-                        if (event.data?.type === "farcaster:frame-transaction") {
-                            console.log("✅ Frame Wallet transaction confirmed");
-                            iframeRef.current?.contentWindow?.postMessage(
-                                { type: "PaymentSuccess" },
-                                "*"
-                            );
-                        }
+                // Optional: confirm message from Frame Wallet UI
+                window.addEventListener("message", (event: MessageEvent<FrameTransactionMessage>) => {
+                    if (event.data?.type === "farcaster:frame-transaction") {
+                        console.log("✅ Frame Wallet transaction confirmed");
                     }
-                );
+                });
             } catch (err) {
-                console.error("❌ Error initializing Farcaster + Unity bridge:", err);
+                console.error("❌ Error initializing bridge:", err);
             }
         };
 
