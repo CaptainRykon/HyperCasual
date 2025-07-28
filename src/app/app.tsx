@@ -105,8 +105,20 @@ export default function App() {
                         case "request-payment":
                             console.log("💸 Unity requested locked 2 USDC payment");
 
-                            if (!walletClient) {
-                                console.error("❌ No wallet client available");
+                            const waitForWalletClient = async (): Promise<typeof walletClient> => {
+                                let retries = 5;
+                                while (!walletClient && retries > 0) {
+                                    console.log("⏳ Waiting for wallet client...");
+                                    await new Promise((res) => setTimeout(res, 500));
+                                    retries--;
+                                }
+                                return walletClient;
+                            };
+
+                            const client = await waitForWalletClient();
+
+                            if (!client) {
+                                console.error("❌ Wallet client still not available");
                                 return;
                             }
 
@@ -131,29 +143,28 @@ export default function App() {
                             });
 
                             try {
-                                const txHash = await walletClient.sendTransaction({
+                                const txHash = await client.sendTransaction({
                                     to: usdcContract,
                                     data,
                                     value: 0n,
                                 });
 
-                                console.log("⏳ Payment transaction sent:", txHash);
+                                console.log("✅ Transaction sent:", txHash);
 
                                 iframeRef.current?.contentWindow?.postMessage(
                                     {
                                         type: "UNITY_METHOD_CALL",
                                         method: "SetPaymentSuccess",
-                                        args: ["1"], // 💥 THIS is what Unity expects
+                                        args: ["1"],
                                     },
                                     "*"
                                 );
-
-                                console.log("✅ Payment success sent to Unity");
                             } catch (err) {
                                 console.error("❌ Payment failed:", err);
                             }
 
                             break;
+
                     }
                 });
 
