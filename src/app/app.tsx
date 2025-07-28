@@ -2,8 +2,8 @@
 
 import { useEffect, useRef } from "react";
 import sdk from "@farcaster/frame-sdk";
+import { parseUnits, Interface } from "ethers";
 import { ALLOWED_FIDS } from "../utils/AllowedFids";
-import { verifyTransaction } from "../utils/verifyTransaction"; // ✅ Import your new verification function
 
 type FarcasterUserInfo = {
     username: string;
@@ -28,7 +28,11 @@ type UnityMessage =
 type FrameActionMessage = {
     type: "frame-action";
     action: "get-user-context" | "request-payment";
-    amount?: string;
+};
+
+type FrameTransactionMessage = {
+    type: "farcaster:frame-transaction";
+    data?: unknown;
 };
 
 export default function App() {
@@ -43,6 +47,7 @@ export default function App() {
         const init = async () => {
             try {
                 await sdk.actions.ready();
+
                 const context = await sdk.context;
                 const user = context?.user || {};
 
@@ -82,9 +87,10 @@ export default function App() {
 
                 iframeRef.current?.addEventListener("load", postToUnity);
 
+                // Handle Unity -> React bridge messages
                 window.addEventListener(
                     "message",
-                    async (event: MessageEvent<FrameActionMessage>) => {
+                    (event: MessageEvent<FrameActionMessage>) => {
                         const { type, action } = event.data || {};
                         if (type !== "frame-action") return;
 
@@ -94,46 +100,50 @@ export default function App() {
                                 break;
 
                             case "request-payment":
-                                console.log("💸 Unity requested payment");
+                                console.log("💸 Unity requested locked 2 USDC payment");
 
-                                try {
-                                    const { fid } = userInfoRef.current;
+                                const recipient = "0xE51f63637c549244d0A8E11ac7E6C86a1E9E0670"; // Your address
+                                const usdcContract = "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913"; // USDC on Base
 
-                                    const result = await sdk.actions.sendToken({
-                                        token: "eip155:8453/erc20:0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913", // USDC on Base
-                                        amount: "2000000", // 2 USDC
-                                        recipientFid: Number(fid),
-                                        recipientAddress: "0xE51f63637c549244d0A8E11ac7E6C86a1E9E0670",
-                                    });
+                                const iface = new Interface([
+                                    "function transfer(address to, uint256 amount)",
+                                ]);
 
-                                    if (!result.success) {
-                                        console.error("❌ Payment failed:", result.reason, result.error?.message);
-                                        return;
-                                    }
+                                const amount = parseUnits("2", 6); // 2 USDC
+                                const data = iface.encodeFunctionData("transfer", [recipient, amount]);
 
-                                    const txHash = result.send.transaction;
-                                    console.log("✅ Payment complete, tx hash:", txHash);
+                                const paymentRequest = {
+                                    type: "farcaster:request-payment",
+                                    data: {
+                                        chainId: "eip155:8453", // Base Mainnet
+                                        method: "eth_sendTransaction",
+                                        params: [
+                                            {
+                                                to: usdcContract,
+                                                data,
+                                                value: "0x0",
+                                            },
+                                        ],
+                                    },
+                                };
 
-                                    const verified = await verifyTransaction(txHash); // ✅ Using the new utility
-                                    if (!verified) {
-                                        console.warn("❌ On-chain payment verification failed");
-                                        return;
-                                    }
-
-                                    const iw = iframeRef.current?.contentWindow;
-                                    iw?.postMessage(
-                                        {
-                                            type: "UNITY_METHOD_CALL",
-                                            method: "SetPaymentSuccess",
-                                            args: ["1"],
-                                        },
-                                        "*"
-                                    );
-                                } catch (err) {
-                                    console.error("❌ Error during payment:", err);
-                                }
-
+                                window.parent.postMessage(paymentRequest, "*");
+                                console.log("📤 Sent locked payment popup to Frame Wallet");
                                 break;
+                        }
+                    }
+                );
+
+                // Frame Wallet → React: Payment confirmation
+                window.addEventListener(
+                    "message",
+                    (event: MessageEvent<FrameTransactionMessage>) => {
+                        if (event.data?.type === "farcaster:frame-transaction") {
+                            console.log("✅ Frame Wallet transaction confirmed");
+                            iframeRef.current?.contentWindow?.postMessage(
+                                { type: "PaymentSuccess" },
+                                "*"
+                            );
                         }
                     }
                 );
