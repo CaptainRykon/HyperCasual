@@ -3,193 +3,248 @@
 import { useEffect, useRef } from "react";
 import sdk from "@farcaster/frame-sdk";
 import { ALLOWED_FIDS } from "../utils/AllowedFids";
-import { parseUnits } from "ethers"; // FIX: Correct utils import
+import { parseUnits } from "ethers";
 import { encodeFunctionData } from "viem";
 import { useAccount, useWalletClient } from "wagmi";
 
 type FarcasterUserInfo = {
-    username: string;
-    pfpUrl: string;
-    fid: string;
+  username: string;
+  pfpUrl: string;
+  fid: string;
 };
 
 type UnityMessage =
-    | {
-        type: "FARCASTER_USER_INFO";
-        payload: {
-            username: string;
-            pfpUrl: string;
-        };
+  | {
+      type: "FARCASTER_USER_INFO";
+      payload: {
+        username: string;
+        pfpUrl: string;
+      };
     }
-    | {
-        type: "UNITY_METHOD_CALL";
-        method: string;
-        args: string[];
+  | {
+      type: "UNITY_METHOD_CALL";
+      method: string;
+      args: string[];
     };
 
 type FrameActionMessage = {
-    type: "frame-action";
-    action: "get-user-context" | "request-payment";
+  type: "frame-action";
+  action:
+    | "get-user-context"
+    | "request-payment"
+    | "share-game"
+    | "share-score"
+    | "send-notification";
+  message?: string;
 };
 
 type FrameTransactionMessage = {
-    type: "farcaster:frame-transaction";
-    data?: unknown;
+  type: "farcaster:frame-transaction";
+  data?: unknown;
 };
 
+type OpenUrlMessage = {
+  action: "open-url";
+  url: string;
+};
+
+function isOpenUrlMessage(msg: any): msg is OpenUrlMessage {
+  return msg?.action === "open-url" && typeof msg.url === "string";
+}
+
 export default function App() {
-    const iframeRef = useRef<HTMLIFrameElement>(null);
-    const userInfoRef = useRef<FarcasterUserInfo>({
-        username: "Guest",
-        pfpUrl: "",
-        fid: "",
-    });
+  const iframeRef = useRef<HTMLIFrameElement>(null);
+  const userInfoRef = useRef<FarcasterUserInfo>({
+    username: "Guest",
+    pfpUrl: "",
+    fid: "",
+  });
 
-    const { address } = useAccount();
-    const { data: walletClient } = useWalletClient();
+  const { address } = useAccount();
+  const { data: walletClient } = useWalletClient();
 
-    useEffect(() => {
-        const init = async () => {
-            try {
-                await sdk.actions.ready();
+  useEffect(() => {
+    const init = async () => {
+      try {
+        await sdk.actions.ready();
 
-                const context = await sdk.context;
-                const user = context?.user || {};
+        const context = await sdk.context;
+        const user = context?.user || {};
 
-                userInfoRef.current = {
-                    username: user.username || "Guest",
-                    pfpUrl: user.pfpUrl || "",
-                    fid: user.fid?.toString() || "",
-                };
-
-                const postToUnity = () => {
-                    const iw = iframeRef.current?.contentWindow;
-                    if (!iw) return;
-
-                    const { username, pfpUrl, fid } = userInfoRef.current;
-                    const isAllowed = ALLOWED_FIDS.includes(Number(fid));
-
-                    const messages: UnityMessage[] = [
-                        {
-                            type: "FARCASTER_USER_INFO",
-                            payload: { username, pfpUrl },
-                        },
-                        {
-                            type: "UNITY_METHOD_CALL",
-                            method: "SetFarcasterFID",
-                            args: [fid],
-                        },
-                        {
-                            type: "UNITY_METHOD_CALL",
-                            method: "SetFidGateState",
-                            args: [isAllowed ? "1" : "0"],
-                        },
-                    ];
-
-                    messages.forEach((msg) => iw.postMessage(msg, "*"));
-                    console.log("✅ Posted info to Unity →", { username, fid, isAllowed });
-                };
-
-                iframeRef.current?.addEventListener("load", postToUnity);
-
-                // Unity -> React
-                window.addEventListener("message", async (event: MessageEvent<FrameActionMessage>) => {
-                    const { type, action } = event.data || {};
-                    if (type !== "frame-action") return;
-
-                    switch (action) {
-                        case "get-user-context":
-                            postToUnity();
-                            break;
-
-                        case "request-payment":
-                            console.log("💸 Unity requested locked 2 USDC payment");
-
-                            const waitForWalletClient = async (): Promise<typeof walletClient> => {
-                                let retries = 5;
-                                while (!walletClient && retries > 0) {
-                                    console.log("⏳ Waiting for wallet client...");
-                                    await new Promise((res) => setTimeout(res, 500));
-                                    retries--;
-                                }
-                                return walletClient;
-                            };
-
-                            const client = await waitForWalletClient();
-
-                            if (!client) {
-                                console.error("❌ Wallet client still not available");
-                                return;
-                            }
-
-                            const recipient = "0xE51f63637c549244d0A8E11ac7E6C86a1E9E0670";
-                            const usdcContract = "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913";
-
-                            const data = encodeFunctionData({
-                                abi: [
-                                    {
-                                        name: "transfer",
-                                        type: "function",
-                                        stateMutability: "nonpayable",
-                                        inputs: [
-                                            { name: "to", type: "address" },
-                                            { name: "amount", type: "uint256" },
-                                        ],
-                                        outputs: [{ name: "", type: "bool" }],
-                                    },
-                                ],
-                                functionName: "transfer",
-                                args: [recipient, parseUnits("2", 6)],
-                            });
-
-                            try {
-                                const txHash = await client.sendTransaction({
-                                    to: usdcContract,
-                                    data,
-                                    value: 0n,
-                                });
-
-                                console.log("✅ Transaction sent:", txHash);
-
-                                iframeRef.current?.contentWindow?.postMessage(
-                                    {
-                                        type: "UNITY_METHOD_CALL",
-                                        method: "SetPaymentSuccess",
-                                        args: ["1"],
-                                    },
-                                    "*"
-                                );
-                            } catch (err) {
-                                console.error("❌ Payment failed:", err);
-                            }
-
-                            break;
-
-                    }
-                });
-
-                // Optional: confirm message from Frame Wallet UI
-                window.addEventListener("message", (event: MessageEvent<FrameTransactionMessage>) => {
-                    if (event.data?.type === "farcaster:frame-transaction") {
-                        console.log("✅ Frame Wallet transaction confirmed");
-                    }
-                });
-            } catch (err) {
-                console.error("❌ Error initializing bridge:", err);
-            }
+        userInfoRef.current = {
+          username: user.username || "Guest",
+          pfpUrl: user.pfpUrl || "",
+          fid: user.fid?.toString() || "",
         };
 
-        init();
-    }, [address, walletClient]);
+        const postToUnity = () => {
+          const iw = iframeRef.current?.contentWindow;
+          if (!iw) return;
 
-    return (
-        <div style={{ width: "100vw", height: "100vh", overflow: "hidden" }}>
-            <iframe
-                ref={iframeRef}
-                src="/BridgeWebgl/index.html"
-                style={{ width: "100%", height: "100%", border: "none" }}
-                allowFullScreen
-            />
-        </div>
-    );
+          const { username, pfpUrl, fid } = userInfoRef.current;
+          const isAllowed = ALLOWED_FIDS.includes(Number(fid));
+
+          const messages: UnityMessage[] = [
+            {
+              type: "FARCASTER_USER_INFO",
+              payload: { username, pfpUrl },
+            },
+            {
+              type: "UNITY_METHOD_CALL",
+              method: "SetFarcasterFID",
+              args: [fid],
+            },
+            {
+              type: "UNITY_METHOD_CALL",
+              method: "SetFidGateState",
+              args: [isAllowed ? "1" : "0"],
+            },
+          ];
+
+          messages.forEach((msg) => iw.postMessage(msg, "*"));
+          console.log("✅ Posted info to Unity →", { username, fid, isAllowed });
+        };
+
+        iframeRef.current?.addEventListener("load", postToUnity);
+
+        window.addEventListener("message", async (event) => {
+          const data = event.data;
+
+          if (data?.type === "frame-action") {
+            const actionData = data as FrameActionMessage;
+
+            switch (actionData.action) {
+              case "get-user-context":
+                console.log("📨 Unity requested Farcaster user context");
+                postToUnity();
+                break;
+
+              case "request-payment":
+                console.log("💸 Unity requested locked 2 USDC payment");
+
+                const waitForWalletClient = async (): Promise<typeof walletClient> => {
+                  let retries = 5;
+                  while (!walletClient && retries > 0) {
+                    console.log("⏳ Waiting for wallet client...");
+                    await new Promise((res) => setTimeout(res, 500));
+                    retries--;
+                  }
+                  return walletClient;
+                };
+
+                const client = await waitForWalletClient();
+                if (!client) {
+                  console.error("❌ Wallet client still not available");
+                  return;
+                }
+
+                const recipient = "0xE51f63637c549244d0A8E11ac7E6C86a1E9E0670";
+                const usdcContract = "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913";
+
+                const txData = encodeFunctionData({
+                  abi: [
+                    {
+                      name: "transfer",
+                      type: "function",
+                      stateMutability: "nonpayable",
+                      inputs: [
+                        { name: "to", type: "address" },
+                        { name: "amount", type: "uint256" },
+                      ],
+                      outputs: [{ name: "", type: "bool" }],
+                    },
+                  ],
+                  functionName: "transfer",
+                  args: [recipient, parseUnits("2", 6)],
+                });
+
+                try {
+                  const txHash = await client.sendTransaction({
+                    to: usdcContract,
+                    data: txData,
+                    value: 0n,
+                  });
+
+                  console.log("✅ Transaction sent:", txHash);
+
+                  iframeRef.current?.contentWindow?.postMessage(
+                    {
+                      type: "UNITY_METHOD_CALL",
+                      method: "SetPaymentSuccess",
+                      args: ["1"],
+                    },
+                    "*"
+                  );
+                } catch (err) {
+                  console.error("❌ Payment failed:", err);
+                }
+                break;
+
+              case "share-game":
+                console.log("🎮 Unity requested to share game");
+                sdk.actions.openUrl(
+                  `https://warpcast.com/~/compose?text=🎮 Try this awesome game!&embeds[]=https://webgl-bridge.vercel.app`
+                );
+                break;
+
+              case "share-score":
+                console.log("🏆 Unity requested to share score:", actionData.message);
+                sdk.actions.openUrl(
+                  `https://warpcast.com/~/compose?text=🏆 I scored ${actionData.message} points! Can you beat me?&embeds[]=https://webgl-bridge.vercel.app`
+                );
+                break;
+
+              case "send-notification":
+                console.log("📬 Notification requested:", actionData.message);
+                if (userInfoRef.current.fid) {
+                  await fetch("/api/send-notification", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                      fid: userInfoRef.current.fid,
+                      title: "🎯 Farcaster Ping!",
+                      body: actionData.message,
+                    }),
+                  });
+                } else {
+                  console.warn("❌ Cannot send notification, FID missing");
+                }
+                break;
+            }
+          }
+
+          if (isOpenUrlMessage(data)) {
+            console.log("🌐 Opening URL via Farcaster SDK:", data.url);
+            sdk.actions.openUrl(data.url);
+          }
+        });
+
+        window.addEventListener("message", (event: MessageEvent<FrameTransactionMessage>) => {
+          if (
+            typeof event.data === "object" &&
+            event.data !== null &&
+            "type" in event.data &&
+            event.data.type === "farcaster:frame-transaction"
+          ) {
+            console.log("✅ Frame Wallet transaction confirmed");
+          }
+        });
+      } catch (err) {
+        console.error("❌ Error initializing bridge:", err);
+      }
+    };
+
+    init();
+  }, [address, walletClient]);
+
+  return (
+    <div style={{ width: "100vw", height: "100vh", overflow: "hidden" }}>
+      <iframe
+        ref={iframeRef}
+        src="/BridgeWebgl/index.html"
+        style={{ width: "100%", height: "100%", border: "none" }}
+        allowFullScreen
+      />
+    </div>
+  );
 }
