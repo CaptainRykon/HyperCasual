@@ -48,8 +48,15 @@ type OpenUrlMessage = {
   url: string;
 };
 
-function isOpenUrlMessage(msg: any): msg is OpenUrlMessage {
-  return msg?.action === "open-url" && typeof msg.url === "string";
+function isOpenUrlMessage(msg: unknown): msg is OpenUrlMessage {
+    return (
+        typeof msg === "object" &&
+        msg !== null &&
+        "action" in msg &&
+        "url" in msg &&
+        (msg as Record<string, unknown>).action === "open-url" &&
+        typeof (msg as Record<string, unknown>).url === "string"
+    );
 }
 
 export default function App() {
