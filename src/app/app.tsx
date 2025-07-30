@@ -190,14 +190,14 @@ export default function App() {
               case "share-game":
                 console.log("🎮 Unity requested to share game");
                 sdk.actions.openUrl(
-                  `https://warpcast.com/~/compose?text=🎮 Try this awesome game!&embeds[]=https://webgl-bridge.vercel.app`
+                  `https://warpcast.com/~/compose?text=🎮 Loving FarGo! Got the Early Access of this Amazing Game&embeds[]=https://fargo-sable.vercel.app`
                 );
                 break;
 
               case "share-score":
                 console.log("🏆 Unity requested to share score:", actionData.message);
                 sdk.actions.openUrl(
-                  `https://warpcast.com/~/compose?text=🏆 I scored ${actionData.message} points! Can you beat me?&embeds[]=https://webgl-bridge.vercel.app`
+                    `https://warpcast.com/~/compose?text=🏆 I scored ${actionData.message} points! Can you beat me?&embeds[]=https://fargo-sable.vercel.app`
                 );
                 break;
 
