@@ -13,7 +13,7 @@
         "imageUrl": "https://fargo-sable.vercel.app/image.png",
         "buttonTitle": "Play Now",
         "splashImageUrl": "https://i.ibb.co/wrysPc1W/Screenshot-2025-07-30-185947.png",
-        "splashBackgroundColor": "#eeccff",
+        "splashBackgroundColor": "#003c47",
         "webhookUrl": "https://api.neynar.com/f/app/86290aac-606b-45af-bf5f-016eb3facbc0/event"
     }
 }
