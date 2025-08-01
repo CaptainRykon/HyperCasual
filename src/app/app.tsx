@@ -65,7 +65,7 @@ export default function App() {
         fid: "",
     });
 
-    const { address } = useAccount();
+    const { address, isConnected } = useAccount();
     const config = useConfig();
 
     useEffect(() => {
@@ -127,7 +127,19 @@ export default function App() {
                             case "request-payment":
                                 console.log("💸 Unity requested locked 2 USDC payment");
 
-                                const client = await getWalletClient(config);
+                                if (!isConnected) {
+                                    console.warn("❌ Wallet not connected. Prompt user to connect.");
+                                    return;
+                                }
+
+                                let client;
+                                try {
+                                    client = await getWalletClient(config);
+                                } catch (e) {
+                                    console.error("❌ Wallet client fetch error:", e);
+                                    return;
+                                }
+
                                 if (!client) {
                                     console.error("❌ Wallet client not available");
                                     return;
@@ -230,7 +242,7 @@ export default function App() {
         };
 
         init();
-    }, [address, config]);
+    }, [address, config, isConnected]);
 
     return (
         <div style={{ width: "100vw", height: "100vh", overflow: "hidden" }}>
