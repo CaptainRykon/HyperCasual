@@ -201,6 +201,9 @@ export default function App() {
                                 );
                                 break;
 
+                
+
+
                             case "send-notification":
                                 console.log("📬 Notification requested:", actionData.message);
                                 if (userInfoRef.current.fid) {
@@ -217,8 +220,20 @@ export default function App() {
                                     console.warn("❌ Cannot send notification, FID missing");
                                 }
                                 break;
+
+
                         }
                     }
+
+
+                    if (data?.action === "open-url") {
+                        const target = data.url;
+                        if (typeof target === "string" && target.startsWith("http")) {
+                            console.log("🌐 Opening URL via Farcaster SDK:", target);
+                            sdk.actions.openUrl(target); // or hardcoded: "https://farcaster.xyz/trenchverse/0x6983116a"
+                        }
+                    }
+
 
                     if (isOpenUrlMessage(data)) {
                         console.log("🌐 Opening URL via Farcaster SDK:", data.url);
