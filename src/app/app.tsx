@@ -231,10 +231,19 @@ export default function App() {
                         }
                     }
 
+                    if (data?.action === "open-url2") {
+                        const target = data.url;
+                        if (typeof target === "string" && target.startsWith("http")) {
+                            console.log("🌐 Opening URL via Farcaster SDK:", target);
+                            sdk.actions.openUrl(target);
+                        }
+                    }
+
                     if (isOpenUrlMessage(data)) {
                         console.log("🌐 Opening URL via Farcaster SDK:", data.url);
                         sdk.actions.openUrl(data.url);
                     }
+
                 });
 
                 window.addEventListener("message", (event: MessageEvent<FrameTransactionMessage>) => {
