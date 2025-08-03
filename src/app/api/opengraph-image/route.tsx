@@ -14,7 +14,7 @@ export async function GET(request: NextRequest) {
         (
             <div tw="flex items-center justify-center w-full h-full relative">
                 <img
-                    src="https://i.ibb.co/5h4B5Vjp/Untitled-design-86.png" // ✅ Replace this with your full image URL
+                    src="https://i.ibb.co/QjrK07K9/1000083019.jpg" // ✅ Replace this with your full image URL
                     alt="OG Image"
                     tw="absolute w-full h-full object-cover"
                 />

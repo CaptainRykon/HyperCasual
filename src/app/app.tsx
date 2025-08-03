@@ -73,6 +73,9 @@ export default function App() {
             try {
                 await sdk.actions.ready();
 
+                // ✅ Add this line to mark frame start
+                await sdk.actions.addFrame();
+
                 const context = await sdk.context;
                 const user = context?.user || {};
 
@@ -190,7 +193,7 @@ export default function App() {
                             case "share-game":
                                 console.log("🎮 Unity requested to share game");
                                 sdk.actions.openUrl(
-                                    `https://warpcast.com/~/compose?text=🎮 Loving FarGo by @trenchverse 🎮 Got the Early Access of this Amazing Game. Find out if you're eligible to play 👇 Game&embeds[]=https://fargo-sable.vercel.app`
+                                    `https://warpcast.com/~/compose?text= Loving FarGo by @trenchverse 🎮 Just got early access to this awesome game! Check if you're eligible to play 👇 &embeds[]=https://fargo-sable.vercel.app`
                                 );
                                 break;
 
@@ -200,9 +203,6 @@ export default function App() {
                                     `https://warpcast.com/~/compose?text=🏆 I scored ${actionData.message} points! Can you beat me?&embeds[]=https://fargo-sable.vercel.app`
                                 );
                                 break;
-
-                
-
 
                             case "send-notification":
                                 console.log("📬 Notification requested:", actionData.message);
@@ -220,20 +220,16 @@ export default function App() {
                                     console.warn("❌ Cannot send notification, FID missing");
                                 }
                                 break;
-
-
                         }
                     }
-
 
                     if (data?.action === "open-url") {
                         const target = data.url;
                         if (typeof target === "string" && target.startsWith("http")) {
                             console.log("🌐 Opening URL via Farcaster SDK:", target);
-                            sdk.actions.openUrl(target); // or hardcoded: "https://farcaster.xyz/trenchverse/0x6983116a"
+                            sdk.actions.openUrl(target);
                         }
                     }
-
 
                     if (isOpenUrlMessage(data)) {
                         console.log("🌐 Opening URL via Farcaster SDK:", data.url);
