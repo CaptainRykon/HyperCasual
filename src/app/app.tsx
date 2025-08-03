@@ -193,7 +193,9 @@ export default function App() {
                             case "share-game":
                                 console.log("🎮 Unity requested to share game");
                                 sdk.actions.openUrl(
-                                    `https://warpcast.com/~/compose?text= Loving FarGo by @trenchverse 🎮 Just got early access to this awesome game! Check if you're eligible to play 👇 &embeds[]=https://fargo-sable.vercel.app`
+                                    `https://warpcast.com/~/compose?text= Loving FarGo by @trenchverse 🎮
+                                    Just got early access to this awesome game! 
+                                    Check if you're eligible to play 👇 &embeds[]=https://fargo-sable.vercel.app`
                                 );
                                 break;
 
