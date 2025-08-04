@@ -1,6 +1,7 @@
 // src/utils/AllowedFids.ts
 
 export const ALLOWED_FIDS: number[] = [
+1018392,
 1020251,
 438631,
 417384,
@@ -467,6 +468,15 @@ export const ALLOWED_FIDS: number[] = [
 333261,
 509017,
 988816,
+198465,
+12990,
+1087818,
+1045053,
+414347,
+391722,
+310953,
+1049497,
+676576,
 
   // Add more FIDs here
 ];
