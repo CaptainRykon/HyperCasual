@@ -3,7 +3,6 @@
 export const ALLOWED_FIDS: number[] = [
 1018392,
 1020251,
-438631,
 417384,
 815610,
 386166,
