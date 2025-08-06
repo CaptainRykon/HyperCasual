@@ -483,6 +483,8 @@ export const ALLOWED_FIDS: number[] = [
 1078139,
 398694,
 454826,
+918738,
+438631,
 
-  // Add more FIDs here
+
 ];
