@@ -1,10 +1,14 @@
-
 {
     "accountAssociation": {
         "header": "eyJmaWQiOjEwMjAyNTEsInR5cGUiOiJjdXN0b2R5Iiwia2V5IjoiMHg5ZDZBMzk3RjA0Yjk1NDk2QTIwNzVDRDBkMUUyYTIyMkZCZTA2ZGE0In0",
         "payload": "eyJkb21haW4iOiJmYXJnby1zYWJsZS52ZXJjZWwuYXBwIn0",
         "signature": "MHgyM2ZlNzE3NjhhMmE3OWNmMTI0ZjMzYWU5YTU5MzhhMTcwMDA1MzI0NDE0MmFiZTczNDA3MzZiYjUzNjViN2Q3NjgyZjQ2NTM0M2YxNjZhNWFkMTA2YzViYzM1YmI1NWIwY2NkY2RjN2Q1OWVlYjc0MGY2ODdkNmRlYTkwOGVhZjFi"
     },
+
+    "baseBuilder": {
+        "allowedAddresses": [ "0xD9c100E64f736f8C79F00Cdcc793cf893A488274"
+    },
+
     "frame": {
         "version": "1",
         "name": "FarGo",
