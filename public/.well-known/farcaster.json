@@ -6,7 +6,7 @@
     },
 
     "baseBuilder": {
-        "allowedAddresses": [ "0xD9c100E64f736f8C79F00Cdcc793cf893A488274"
+        "allowedAddresses": [ "0xD9c100E64f736f8C79F00Cdcc793cf893A488274" ]
     },
 
     "frame": {
