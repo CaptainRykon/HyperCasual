@@ -193,7 +193,7 @@ export default function App() {
                             case "share-game":
                                 console.log("🎮 Unity requested to share game");
                                 sdk.actions.openUrl(
-                                    `https://warpcast.com/~/compose?text= Math is mathing! 💥 Just smashed another level in FarGo by @trenchverse 🚀 &embeds[]=https://fargo-sable.vercel.app`
+                                    `https://warpcast.com/~/compose?text= Math is mathing! 💥 Just smashed another level in Based Run by @trenchverse 🚀 &embeds[]=https://fargo-sable.vercel.app`
                                 );
                                 break;
 
