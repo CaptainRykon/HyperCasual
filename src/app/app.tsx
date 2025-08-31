@@ -239,6 +239,23 @@ export default function App() {
                         }
                     }
 
+                    if (data?.action === "open-url3") {
+                        const target = data.url;
+                        if (typeof target === "string" && target.startsWith("http")) {
+                            console.log("🌐 Opening URL via Farcaster SDK:", target);
+                            sdk.actions.openUrl(target);
+                        }
+                    }
+
+                    if (data?.action === "open-url4") {
+                        const target = data.url;
+                        if (typeof target === "string" && target.startsWith("http")) {
+                            console.log("🌐 Opening URL via Farcaster SDK:", target);
+                            sdk.actions.openUrl(target);
+                        }
+                    }
+
+
                     if (isOpenUrlMessage(data)) {
                         console.log("🌐 Opening URL via Farcaster SDK:", data.url);
                         sdk.actions.openUrl(data.url);
