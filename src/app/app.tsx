@@ -51,14 +51,16 @@ type OpenUrlMessage = { action: "open-url"; url: string };
 type IncomingMessage = FrameActionMessage | FrameTransactionMessage | OpenUrlMessage | unknown;
 
 function isOpenUrlMessage(msg: unknown): msg is OpenUrlMessage {
-  return (
+  if (
     typeof msg === "object" &&
     msg !== null &&
     "action" in msg &&
-    (msg as any).action === "open-url" &&
-    "url" in msg &&
-    typeof (msg as any).url === "string"
-  );
+    "url" in msg
+  ) {
+    const m = msg as { action: unknown; url: unknown };
+    return m.action === "open-url" && typeof m.url === "string";
+  }
+  return false;
 }
 
 export default function App() {
@@ -304,12 +306,17 @@ export default function App() {
               }
             }
 
-            if (isOpenUrlMessage(data)) {
-              const target = data.url;
-              if (target.startsWith("http")) {
-                baseActions?.openUrl(target) ?? window.open(target, "_blank");
+           if (isOpenUrlMessage(data)) {
+                const target = data.url;
+                if (target.startsWith("http")) {
+                   if (baseActions?.openUrl) {
+                        baseActions.openUrl(target);
+                        } else {
+                         window.open(target, "_blank");
+                        }
+                    }
               }
-            }
+
           });
         }
       } catch (err) {
