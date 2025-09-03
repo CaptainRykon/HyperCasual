@@ -20,6 +20,7 @@
     "cleanup": "lsof -ti :3000 | xargs kill -9"
   },
   "dependencies": {
+    "@coinbase/onchainkit": "^0.38.19",
     "@daimo/pay": "^1.14.1",
     "@farcaster/auth-client": ">=0.3.0 <1.0.0",
     "@farcaster/auth-kit": ">=0.6.0 <1.0.0",
