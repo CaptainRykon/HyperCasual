@@ -9,21 +9,23 @@ import { APP_NAME, APP_ICON_URL, APP_URL } from "~/lib/constants";
 import { useEffect, useState } from "react";
 import { useConnect, useAccount } from "wagmi";
 import React from "react";
-import type { EthereumProvider } from "@wagmi/core"; // <-- bring in base type
 
 // --------------------------------------------------
-// ✅ Type Augmentation for Coinbase Wallet flags
+// ✅ Runtime type guard for Coinbase Wallet flags
 // --------------------------------------------------
-declare global {
-    interface EthereumProvider {
-        isCoinbaseWallet?: boolean;
-        isCoinbaseWalletExtension?: boolean;
-        isCoinbaseWalletBrowser?: boolean;
-    }
-
-    interface Window {
-        ethereum?: EthereumProvider;
-    }
+function isCoinbaseEthereumProvider(
+    provider: unknown
+): provider is typeof window.ethereum & {
+    isCoinbaseWallet?: boolean;
+    isCoinbaseWalletExtension?: boolean;
+    isCoinbaseWalletBrowser?: boolean;
+} {
+    if (!provider || typeof provider !== "object") return false;
+    return (
+        "isCoinbaseWallet" in provider ||
+        "isCoinbaseWalletExtension" in provider ||
+        "isCoinbaseWalletBrowser" in provider
+    );
 }
 
 // --------------------------------------------------
@@ -36,11 +38,12 @@ function useCoinbaseWalletAutoConnect() {
 
     useEffect(() => {
         const checkCoinbaseWallet = () => {
-            const provider = window.ethereum as EthereumProvider | undefined;
+            const provider = window.ethereum;
             const isInCoinbaseWallet =
-                provider?.isCoinbaseWallet ||
-                provider?.isCoinbaseWalletExtension ||
-                provider?.isCoinbaseWalletBrowser;
+                isCoinbaseEthereumProvider(provider) &&
+                (provider.isCoinbaseWallet ||
+                    provider.isCoinbaseWalletExtension ||
+                    provider.isCoinbaseWalletBrowser);
 
             setIsCoinbaseWallet(!!isInCoinbaseWallet);
         };
