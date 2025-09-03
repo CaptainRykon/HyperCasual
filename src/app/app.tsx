@@ -8,21 +8,31 @@ import { encodeFunctionData } from "viem";
 import { useAccount, useConfig } from "wagmi";
 import { getWalletClient } from "wagmi/actions";
 
+// ✅ Types for Base + Farcaster
+interface BaseProvider {
+  request: (args: { method: string; params?: unknown[] }) => Promise<unknown>;
+}
+
+interface BaseActions {
+  openUrl: (url: string) => void;
+}
+
+interface BaseWindow {
+  provider?: BaseProvider;
+  actions?: BaseActions;
+}
+
 declare global {
   interface Window {
     farcaster?: unknown;
-    base?: {
-      // Base App injects a provider that implements EIP-1193 methods like wallet_sendCalls
-      provider?: {
-        request: (args: { method: string; params?: any[] }) => Promise<any>;
-      };
-    };
+    base?: BaseWindow;
     ethereum?: {
-      request?: (args: { method: string; params?: any[] }) => Promise<any>;
+      request?: (args: { method: string; params?: unknown[] }) => Promise<unknown>;
     };
   }
 }
 
+// ---- Farcaster/User Types ----
 type FarcasterUserInfo = { username: string; pfpUrl: string; fid: string };
 
 type UnityMessage =
@@ -31,25 +41,22 @@ type UnityMessage =
 
 type FrameActionMessage = {
   type: "frame-action";
-  action:
-    | "get-user-context"
-    | "request-payment"
-    | "share-game"
-    | "share-score"
-    | "send-notification";
+  action: "get-user-context" | "request-payment" | "share-game" | "share-score" | "send-notification";
   message?: string;
 };
 
 type FrameTransactionMessage = { type: "farcaster:frame-transaction"; data?: unknown };
 type OpenUrlMessage = { action: "open-url"; url: string };
 
+type IncomingMessage = FrameActionMessage | FrameTransactionMessage | OpenUrlMessage | unknown;
+
 function isOpenUrlMessage(msg: unknown): msg is OpenUrlMessage {
   return (
     typeof msg === "object" &&
     msg !== null &&
     "action" in msg &&
-    "url" in msg &&
     (msg as any).action === "open-url" &&
+    "url" in msg &&
     typeof (msg as any).url === "string"
   );
 }
@@ -72,7 +79,7 @@ export default function App() {
         const isBaseApp = !!window.base;
 
         // ========================================================
-        // FARCASTER MINI APP (UNCHANGED)
+        // FARCASTER MINI APP
         // ========================================================
         if (isFarcaster) {
           await sdk.actions.ready();
@@ -104,22 +111,22 @@ export default function App() {
 
           iframeRef.current?.addEventListener("load", postToUnity);
 
-          window.addEventListener("message", async (event) => {
+          window.addEventListener("message", async (event: MessageEvent<IncomingMessage>) => {
             const data = event.data;
-            if (data?.type === "frame-action") {
+            if (!data || typeof data !== "object") return;
+
+            if ("type" in data && (data as FrameActionMessage).type === "frame-action") {
               const actionData = data as FrameActionMessage;
               switch (actionData.action) {
                 case "get-user-context":
                   postToUnity();
                   break;
 
-                case "request-payment": {
+                case "request-payment":
                   if (!isConnected) return;
                   const client = await getWalletClient(config).catch(() => null);
                   if (!client) return;
 
-                  const recipient = "0xE51f63637c549244d0A8E11ac7E6C86a1E9E0670";
-                  const usdcContract = "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913"; // Base USDC
                   const txData = encodeFunctionData({
                     abi: [
                       {
@@ -134,34 +141,33 @@ export default function App() {
                       },
                     ],
                     functionName: "transfer",
-                    args: [recipient, parseUnits("2", 6)],
+                    args: ["0xE51f63637c549244d0A8E11ac7E6C86a1E9E0670", parseUnits("2", 6)],
                   });
 
                   await client
                     .sendTransaction({
-                      to: usdcContract,
+                      to: "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913", // USDC Base contract
                       data: txData,
                       value: 0n,
                     })
                     .then(() =>
                       iframeRef.current?.contentWindow?.postMessage(
                         { type: "UNITY_METHOD_CALL", method: "SetPaymentSuccess", args: ["1"] },
-                        "*",
-                      ),
+                        "*"
+                      )
                     )
                     .catch((e) => console.error("❌ Payment failed:", e));
                   break;
-                }
 
                 case "share-game":
                   sdk.actions.openUrl(
-                    `https://warpcast.com/~/compose?text=Math is mathing! Just smashed another level in Based Run 🚀&embeds[]=https://fargo-sable.vercel.app`,
+                    `https://warpcast.com/~/compose?text=Math is mathing! Just smashed another level in Based Run 🚀&embeds[]=https://fargo-sable.vercel.app`
                   );
                   break;
 
                 case "share-score":
                   sdk.actions.openUrl(
-                    `https://warpcast.com/~/compose?text=🏆 I scored ${actionData.message} points! Can you beat me?&embeds[]=https://fargo-sable.vercel.app`,
+                    `https://warpcast.com/~/compose?text=🏆 I scored ${actionData.message} points! Can you beat me?&embeds[]=https://fargo-sable.vercel.app`
                   );
                   break;
 
@@ -181,9 +187,9 @@ export default function App() {
               }
             }
 
-            if (data?.action?.startsWith("open-url") || isOpenUrlMessage(data)) {
-              const target = (data as any).url;
-              if (typeof target === "string" && target.startsWith("http")) {
+            if (isOpenUrlMessage(data)) {
+              const target = data.url;
+              if (target.startsWith("http")) {
                 sdk.actions.openUrl(target);
               }
             }
@@ -197,20 +203,18 @@ export default function App() {
         }
 
         // ========================================================
-        // BASE MINI APP (USDC PAYMENT FLOW via wallet_sendCalls)
+        // BASE MINI APP
         // ========================================================
         if (isBaseApp) {
-          console.log("🌐 Running inside Base App Mini App");
+          console.log("Base App Mini App detected");
 
-          // MiniKit hooks are typically used with a provider; for a pure imperative flow in Mini Apps,
-          // call the Base provider directly with wallet_sendCalls.
-          // Docs: https://docs.base.org/.../provider/methods#wallet_sendcalls (see "Accept Payments" & reference)
-          const baseProvider =
-            window.base?.provider || window.ethereum; // fallback if provider is surfaced on window.ethereum
+          // ---- Get Base provider/actions
+          const baseProvider = window.base?.provider ?? window.ethereum;
+          const baseActions = window.base?.actions;
 
-          // Optionally: pull user context if exposed by the host app in your environment
+          // ---- Fake user for demo (replace with miniKit context if needed)
           userInfoRef.current = {
-            username: "Guest",
+            username: "BaseUser",
             pfpUrl: "",
             fid: "",
           };
@@ -229,23 +233,21 @@ export default function App() {
 
           iframeRef.current?.addEventListener("load", postToUnity);
 
-          window.addEventListener("message", async (event) => {
+          window.addEventListener("message", async (event: MessageEvent<IncomingMessage>) => {
             const data = event.data;
-            if (data?.type === "frame-action") {
+            if (!data || typeof data !== "object") return;
+
+            if ("type" in data && (data as FrameActionMessage).type === "frame-action") {
               const actionData = data as FrameActionMessage;
+
               switch (actionData.action) {
                 case "get-user-context":
                   postToUnity();
                   break;
 
-                case "request-payment": {
-                  if (!baseProvider?.request) {
-                    console.error("❌ No Base provider available in this environment.");
-                    return;
-                  }
+                case "request-payment":
+                  if (!baseProvider?.request) return;
 
-                  const recipient = "0xE51f63637c549244d0A8E11ac7E6C86a1E9E0670";
-                  const usdcContract = "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913"; // Base USDC (8453)
                   const txDataBase = encodeFunctionData({
                     abi: [
                       {
@@ -260,96 +262,60 @@ export default function App() {
                       },
                     ],
                     functionName: "transfer",
-                    args: [recipient, parseUnits("2", 6)],
+                    args: ["0xE51f63637c549244d0A8E11ac7E6C86a1E9E0670", parseUnits("2", 6)],
                   });
 
                   try {
                     await baseProvider.request({
-                      method: "wallet_sendCalls",
+                      method: "eth_sendTransaction",
                       params: [
                         {
-                          version: "1.0",
-                          chainId: "0x2105", // 8453 Base mainnet
-                          calls: [{ to: usdcContract, data: txDataBase }],
-                          // Optional capabilities (e.g., paymasterService) can be added here
-                          // capabilities: { paymasterService: { url: "https://..." } },
+                          to: "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913", // USDC Base contract
+                          data: txDataBase,
+                          value: "0x0",
                         },
                       ],
                     });
 
                     iframeRef.current?.contentWindow?.postMessage(
                       { type: "UNITY_METHOD_CALL", method: "SetPaymentSuccess", args: ["1"] },
-                      "*",
+                      "*"
                     );
                   } catch (err) {
                     console.error("❌ Base USDC payment failed:", err);
                     iframeRef.current?.contentWindow?.postMessage(
                       { type: "UNITY_METHOD_CALL", method: "SetPaymentSuccess", args: ["0"] },
-                      "*",
+                      "*"
                     );
                   }
                   break;
-                }
 
-                case "share-game": {
-                  const url =
-                    "https://warpcast.com/~/compose?text=🚀 Playing Based Run inside Base App! 💥&embeds[]=https://fargo-sable.vercel.app";
-                  // If the host exposes an openUrl action, use it; otherwise fall back to window.open
-                  try {
-                    // @ts-ignore - some hosts may expose actions
-                    if ((window as any).base?.actions?.openUrl) {
-                      // @ts-ignore
-                      (window as any).base.actions.openUrl(url);
-                    } else {
-                      window.open(url, "_blank");
-                    }
-                  } catch {
-                    window.open(url, "_blank");
-                  }
+                case "share-game":
+                  baseActions?.openUrl(
+                    `https://warpcast.com/~/compose?text=Playing Based Run (Base App)!&embeds[]=https://fargo-sable.vercel.app`
+                  );
                   break;
-                }
 
-                case "share-score": {
-                  const url = `https://warpcast.com/~/compose?text=🏆 I scored ${actionData.message} points in Based Run (Base App)!&embeds[]=https://fargo-sable.vercel.app`;
-                  try {
-                    // @ts-ignore
-                    if ((window as any).base?.actions?.openUrl) {
-                      // @ts-ignore
-                      (window as any).base.actions.openUrl(url);
-                    } else {
-                      window.open(url, "_blank");
-                    }
-                  } catch {
-                    window.open(url, "_blank");
-                  }
+                case "share-score":
+                  baseActions?.openUrl(
+                    `https://warpcast.com/~/compose?text=I scored ${actionData.message} points in Based Run (Base App)!&embeds[]=https://fargo-sable.vercel.app`
+                  );
                   break;
-                }
               }
             }
 
-            if (data?.action?.startsWith("open-url") || isOpenUrlMessage(data)) {
-              const target = (data as any).url;
-              if (typeof target === "string" && target.startsWith("http")) {
-                try {
-                  // @ts-ignore
-                  if ((window as any).base?.actions?.openUrl) {
-                    // @ts-ignore
-                    (window as any).base.actions.openUrl(target);
-                  } else {
-                    window.open(target, "_blank");
-                  }
-                } catch {
-                  window.open(target, "_blank");
-                }
+            if (isOpenUrlMessage(data)) {
+              const target = data.url;
+              if (target.startsWith("http")) {
+                baseActions?.openUrl(target) ?? window.open(target, "_blank");
               }
             }
           });
         }
       } catch (err) {
-        console.error("❌ Error initializing bridge:", err);
+        console.error("Bridge initialization error:", err);
       }
     };
-
     init();
   }, [address, config, isConnected]);
 
