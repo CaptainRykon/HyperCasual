@@ -165,7 +165,7 @@ export default function App() {
                                         },
                                     ],
                                     functionName: "transfer",
-                                    args: [recipient, parseUnits("2", 6)],
+                                    args: [recipient, parseUnits("1", 6)],
                                 });
 
                                 try {
