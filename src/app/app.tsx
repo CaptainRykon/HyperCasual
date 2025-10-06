@@ -7,6 +7,7 @@ import { parseUnits } from "ethers";
 import { encodeFunctionData } from "viem";
 import { useAccount, useConfig, useSwitchChain } from "wagmi";
 import { getWalletClient } from "wagmi/actions";
+import type { Chain } from "viem/chains";
 
 type FarcasterUserInfo = {
     username: string;
@@ -28,13 +29,13 @@ type UnityMessage =
 type FrameActionMessage = {
     type: "frame-action";
     action:
-    | "get-user-context"
-    | "request-payment"
-    | "share-game"
-    | "share-score"
-    | "send-notification";
+        | "get-user-context"
+        | "request-payment"
+        | "share-game"
+        | "share-score"
+        | "send-notification";
     message?: string;
-    network?: "base" | "celo"; // NEW: network selection
+    network?: "base" | "celo";
 };
 
 type FrameTransactionMessage = {
@@ -70,17 +71,35 @@ export default function App() {
     const config = useConfig();
     const { switchChainAsync } = useSwitchChain();
 
-    // Network configurations
+    // ✅ Move NETWORK_CONFIG outside useEffect to avoid dependency warning
     const NETWORK_CONFIG = {
         base: {
             chainId: 8453,
             usdcContract: "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913" as `0x${string}`,
             name: "Base",
+            chain: {
+                id: 8453,
+                name: "Base Mainnet",
+                nativeCurrency: { name: "Ether", symbol: "ETH", decimals: 18 },
+                rpcUrls: {
+                    default: { http: ["https://mainnet.base.org"] },
+                    public: { http: ["https://mainnet.base.org"] },
+                },
+            } as Chain,
         },
         celo: {
             chainId: 42220,
             usdcContract: "0xcebA9300f2b948710d2653dD7B07f33A8B32118C" as `0x${string}`,
             name: "Celo",
+            chain: {
+                id: 42220,
+                name: "Celo Mainnet",
+                nativeCurrency: { name: "CELO", symbol: "CELO", decimals: 18 },
+                rpcUrls: {
+                    default: { http: ["https://forno.celo.org"] },
+                    public: { http: ["https://forno.celo.org"] },
+                },
+            } as Chain,
         },
     };
 
@@ -91,8 +110,6 @@ export default function App() {
         const init = async () => {
             try {
                 await sdk.actions.ready();
-
-                // ✅ Add this line to mark frame start
                 await sdk.actions.addFrame();
 
                 const context = await sdk.context;
@@ -162,16 +179,14 @@ export default function App() {
                                     return;
                                 }
 
-                                // Default to Base if network not specified
                                 const selectedNetwork = actionData.network || "base";
                                 const networkConfig = NETWORK_CONFIG[selectedNetwork];
 
                                 console.log(`💳 Processing ${PAYMENT_AMOUNT} USDC payment on ${networkConfig.name}...`);
 
                                 try {
-                                    // Switch to correct network if needed
                                     if (chainId !== networkConfig.chainId) {
-                                        console.log(`🔄 Switching to ${networkConfig.name} (Chain ID: ${networkConfig.chainId})...`);
+                                        console.log(`🔄 Switching to ${networkConfig.name}...`);
                                         try {
                                             await switchChainAsync?.({ chainId: networkConfig.chainId });
                                             console.log(`✅ Switched to ${networkConfig.name}`);
@@ -203,10 +218,8 @@ export default function App() {
                                         return;
                                     }
 
-                                    // Parse amount correctly (positive value)
                                     const amountInWei = parseUnits(PAYMENT_AMOUNT, 6);
 
-                                    // Encode USDC transfer
                                     const txData = encodeFunctionData({
                                         abi: [
                                             {
@@ -232,17 +245,15 @@ export default function App() {
                                         contract: networkConfig.usdcContract,
                                     });
 
-                                    // Send transaction
                                     const txHash = await client.sendTransaction({
                                         to: networkConfig.usdcContract,
                                         data: txData,
                                         value: 0n,
-                                        chain: selectedNetwork === "base" ? { id: 8453 } : { id: 42220 },
+                                        chain: networkConfig.chain, // ✅ FIXED
                                     });
 
                                     console.log(`✅ Transaction sent on ${networkConfig.name}:`, txHash);
 
-                                    // Notify Unity of success
                                     iframeRef.current?.contentWindow?.postMessage(
                                         {
                                             type: "UNITY_METHOD_CALL",
@@ -269,7 +280,7 @@ export default function App() {
                             case "share-game":
                                 console.log("🎮 Unity requested to share game");
                                 sdk.actions.openUrl(
-                                    `https://warpcast.com/~/compose?text= Math is mathing! 💥 Just smashed another level in Based Run by @trenchverse 🚀 &embeds[]=https://fargo-sable.vercel.app`
+                                    `https://warpcast.com/~/compose?text=Math is mathing! 💥 Just smashed another level in Based Run by @trenchverse 🚀&embeds[]=https://fargo-sable.vercel.app`
                                 );
                                 break;
 
@@ -299,53 +310,14 @@ export default function App() {
                         }
                     }
 
-                    if (data?.action === "open-url") {
-                        const target = data.url;
-                        if (typeof target === "string" && target.startsWith("http")) {
-                            console.log("🌐 Opening URL via Farcaster SDK:", target);
-                            sdk.actions.openUrl(target);
-                        }
-                    }
-
-                    if (data?.action === "open-url2") {
-                        const target = data.url;
-                        if (typeof target === "string" && target.startsWith("http")) {
-                            console.log("🌐 Opening URL via Farcaster SDK:", target);
-                            sdk.actions.openUrl(target);
-                        }
-                    }
-
-                    if (data?.action === "open-url3") {
-                        const target = data.url;
-                        if (typeof target === "string" && target.startsWith("http")) {
-                            console.log("🌐 Opening URL via Farcaster SDK:", target);
-                            sdk.actions.openUrl(target);
-                        }
-                    }
-
-                    if (data?.action === "open-url4") {
-                        const target = data.url;
-                        if (typeof target === "string" && target.startsWith("http")) {
-                            console.log("🌐 Opening URL via Farcaster SDK:", target);
-                            sdk.actions.openUrl(target);
-                        }
-                    }
-
-
                     if (isOpenUrlMessage(data)) {
                         console.log("🌐 Opening URL via Farcaster SDK:", data.url);
                         sdk.actions.openUrl(data.url);
                     }
-
                 });
 
                 window.addEventListener("message", (event: MessageEvent<FrameTransactionMessage>) => {
-                    if (
-                        typeof event.data === "object" &&
-                        event.data !== null &&
-                        "type" in event.data &&
-                        event.data.type === "farcaster:frame-transaction"
-                    ) {
+                    if (event.data?.type === "farcaster:frame-transaction") {
                         console.log("✅ Frame Wallet transaction confirmed");
                     }
                 });
