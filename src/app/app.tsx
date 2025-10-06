@@ -74,17 +74,17 @@ export default function App() {
     const NETWORK_CONFIG = {
         base: {
             chainId: 8453,
-            usdcContract: "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+            usdcContract: "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913" as `0x${string}`,
             name: "Base",
         },
         celo: {
             chainId: 42220,
-            usdcContract: "0xcebA9300f2b948710d2653dD7B07f33A8B32118C",
+            usdcContract: "0xcebA9300f2b948710d2653dD7B07f33A8B32118C" as `0x${string}`,
             name: "Celo",
         },
     };
 
-    const RECIPIENT = "0xE51f63637c549244d0A8E11ac7E6C86a1E9E0670";
+    const RECIPIENT = "0xE51f63637c549244d0A8E11ac7E6C86a1E9E0670" as `0x${string}`;
     const PAYMENT_AMOUNT = "1"; // 1 USDC
 
     useEffect(() => {
