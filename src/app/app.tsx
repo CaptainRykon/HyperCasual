@@ -172,10 +172,24 @@ export default function App() {
                                     // Switch to correct network if needed
                                     if (chainId !== networkConfig.chainId) {
                                         console.log(`🔄 Switching to ${networkConfig.name} (Chain ID: ${networkConfig.chainId})...`);
-                                        await switchChainAsync?.({ chainId: networkConfig.chainId });
+                                        try {
+                                            await switchChainAsync?.({ chainId: networkConfig.chainId });
+                                            console.log(`✅ Switched to ${networkConfig.name}`);
+                                        } catch (switchError) {
+                                            console.error("❌ Failed to switch network:", switchError);
+                                            iframeRef.current?.contentWindow?.postMessage(
+                                                {
+                                                    type: "UNITY_METHOD_CALL",
+                                                    method: "SetPaymentError",
+                                                    args: ["NETWORK_SWITCH_FAILED", selectedNetwork],
+                                                },
+                                                "*"
+                                            );
+                                            return;
+                                        }
                                     }
 
-                                    const client = await getWalletClient(config);
+                                    const client = await getWalletClient(config, { chainId: networkConfig.chainId });
                                     if (!client) {
                                         console.error("❌ Wallet client not available");
                                         iframeRef.current?.contentWindow?.postMessage(
@@ -188,6 +202,9 @@ export default function App() {
                                         );
                                         return;
                                     }
+
+                                    // Parse amount correctly (positive value)
+                                    const amountInWei = parseUnits(PAYMENT_AMOUNT, 6);
 
                                     // Encode USDC transfer
                                     const txData = encodeFunctionData({
@@ -204,7 +221,15 @@ export default function App() {
                                             },
                                         ],
                                         functionName: "transfer",
-                                        args: [RECIPIENT, parseUnits(PAYMENT_AMOUNT, 6)],
+                                        args: [RECIPIENT, amountInWei],
+                                    });
+
+                                    console.log(`📝 Transaction details:`, {
+                                        network: networkConfig.name,
+                                        amount: PAYMENT_AMOUNT,
+                                        amountInWei: amountInWei.toString(),
+                                        recipient: RECIPIENT,
+                                        contract: networkConfig.usdcContract,
                                     });
 
                                     // Send transaction
@@ -212,6 +237,7 @@ export default function App() {
                                         to: networkConfig.usdcContract,
                                         data: txData,
                                         value: 0n,
+                                        chain: selectedNetwork === "base" ? { id: 8453 } : { id: 42220 },
                                     });
 
                                     console.log(`✅ Transaction sent on ${networkConfig.name}:`, txHash);
