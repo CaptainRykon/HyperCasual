@@ -1,11 +1,11 @@
-﻿"use client";
+"use client";
 
 import { useEffect, useRef } from "react";
 import sdk from "@farcaster/frame-sdk";
 import { ALLOWED_FIDS } from "../utils/AllowedFids";
 import { parseUnits } from "ethers";
 import { encodeFunctionData } from "viem";
-import { useAccount, useConfig } from "wagmi";
+import { useAccount, useConfig, useSwitchChain } from "wagmi";
 import { getWalletClient } from "wagmi/actions";
 
 type FarcasterUserInfo = {
@@ -34,6 +34,7 @@ type FrameActionMessage = {
     | "share-score"
     | "send-notification";
     message?: string;
+    network?: "base" | "celo"; // NEW: network selection
 };
 
 type FrameTransactionMessage = {
@@ -65,8 +66,26 @@ export default function App() {
         fid: "",
     });
 
-    const { address, isConnected } = useAccount();
+    const { address, isConnected, chainId } = useAccount();
     const config = useConfig();
+    const { switchChainAsync } = useSwitchChain();
+
+    // Network configurations
+    const NETWORK_CONFIG = {
+        base: {
+            chainId: 8453,
+            usdcContract: "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+            name: "Base",
+        },
+        celo: {
+            chainId: 42220,
+            usdcContract: "0xcebA9300f2b948710d2653dD7B07f33A8B32118C",
+            name: "Celo",
+        },
+    };
+
+    const RECIPIENT = "0xE51f63637c549244d0A8E11ac7E6C86a1E9E0670";
+    const PAYMENT_AMOUNT = "1"; // 1 USDC
 
     useEffect(() => {
         const init = async () => {
@@ -128,65 +147,96 @@ export default function App() {
                                 break;
 
                             case "request-payment":
-                                console.log("💸 Unity requested locked 2 USDC payment");
+                                console.log("💸 Unity requested payment");
 
                                 if (!isConnected) {
                                     console.warn("❌ Wallet not connected. Prompt user to connect.");
-                                    return;
-                                }
-
-                                let client;
-                                try {
-                                    client = await getWalletClient(config);
-                                } catch (e) {
-                                    console.error("❌ Wallet client fetch error:", e);
-                                    return;
-                                }
-
-                                if (!client) {
-                                    console.error("❌ Wallet client not available");
-                                    return;
-                                }
-
-                                const recipient = "0xE51f63637c549244d0A8E11ac7E6C86a1E9E0670";
-                                const usdcContract = "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913";
-
-                                const txData = encodeFunctionData({
-                                    abi: [
+                                    iframeRef.current?.contentWindow?.postMessage(
                                         {
-                                            name: "transfer",
-                                            type: "function",
-                                            stateMutability: "nonpayable",
-                                            inputs: [
-                                                { name: "to", type: "address" },
-                                                { name: "amount", type: "uint256" },
-                                            ],
-                                            outputs: [{ name: "", type: "bool" }],
+                                            type: "UNITY_METHOD_CALL",
+                                            method: "SetPaymentError",
+                                            args: ["WALLET_NOT_CONNECTED"],
                                         },
-                                    ],
-                                    functionName: "transfer",
-                                    args: [recipient, parseUnits("1", 6)],
-                                });
+                                        "*"
+                                    );
+                                    return;
+                                }
+
+                                // Default to Base if network not specified
+                                const selectedNetwork = actionData.network || "base";
+                                const networkConfig = NETWORK_CONFIG[selectedNetwork];
+
+                                console.log(`💳 Processing ${PAYMENT_AMOUNT} USDC payment on ${networkConfig.name}...`);
 
                                 try {
+                                    // Switch to correct network if needed
+                                    if (chainId !== networkConfig.chainId) {
+                                        console.log(`🔄 Switching to ${networkConfig.name} (Chain ID: ${networkConfig.chainId})...`);
+                                        await switchChainAsync?.({ chainId: networkConfig.chainId });
+                                    }
+
+                                    const client = await getWalletClient(config);
+                                    if (!client) {
+                                        console.error("❌ Wallet client not available");
+                                        iframeRef.current?.contentWindow?.postMessage(
+                                            {
+                                                type: "UNITY_METHOD_CALL",
+                                                method: "SetPaymentError",
+                                                args: ["CLIENT_ERROR", selectedNetwork],
+                                            },
+                                            "*"
+                                        );
+                                        return;
+                                    }
+
+                                    // Encode USDC transfer
+                                    const txData = encodeFunctionData({
+                                        abi: [
+                                            {
+                                                name: "transfer",
+                                                type: "function",
+                                                stateMutability: "nonpayable",
+                                                inputs: [
+                                                    { name: "to", type: "address" },
+                                                    { name: "amount", type: "uint256" },
+                                                ],
+                                                outputs: [{ name: "", type: "bool" }],
+                                            },
+                                        ],
+                                        functionName: "transfer",
+                                        args: [RECIPIENT, parseUnits(PAYMENT_AMOUNT, 6)],
+                                    });
+
+                                    // Send transaction
                                     const txHash = await client.sendTransaction({
-                                        to: usdcContract,
+                                        to: networkConfig.usdcContract,
                                         data: txData,
                                         value: 0n,
                                     });
 
-                                    console.log("✅ Transaction sent:", txHash);
+                                    console.log(`✅ Transaction sent on ${networkConfig.name}:`, txHash);
 
+                                    // Notify Unity of success
                                     iframeRef.current?.contentWindow?.postMessage(
                                         {
                                             type: "UNITY_METHOD_CALL",
                                             method: "SetPaymentSuccess",
-                                            args: ["1"],
+                                            args: ["1", selectedNetwork, txHash],
                                         },
                                         "*"
                                     );
                                 } catch (err) {
-                                    console.error("❌ Payment failed:", err);
+                                    console.error(`❌ Payment failed on ${networkConfig.name}:`, err);
+
+                                    const errorMessage = err instanceof Error ? err.message : "UNKNOWN_ERROR";
+                                    iframeRef.current?.contentWindow?.postMessage(
+                                        {
+                                            type: "UNITY_METHOD_CALL",
+                                            method: "SetPaymentError",
+                                            args: [errorMessage, selectedNetwork],
+                                        },
+                                        "*"
+                                    );
                                 }
                                 break;
 
@@ -279,7 +329,7 @@ export default function App() {
         };
 
         init();
-    }, [address, config, isConnected]);
+    }, [address, config, isConnected, chainId, switchChainAsync]);
 
     return (
         <div style={{ width: "100vw", height: "100vh", overflow: "hidden" }}>
