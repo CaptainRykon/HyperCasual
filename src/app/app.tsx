@@ -168,6 +168,8 @@ export default function App() {
                                     args: [recipient, parseUnits("1", 6)],
                                 });
 
+
+
                                 try {
                                     const txHash = await client.sendTransaction({
                                         to: usdcContract,
