@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useEffect, useRef } from "react";
 import sdk from "@farcaster/frame-sdk";
@@ -167,8 +167,6 @@ export default function App() {
                                     functionName: "transfer",
                                     args: [recipient, parseUnits("1", 6)],
                                 });
-
-
 
                                 try {
                                     const txHash = await client.sendTransaction({
