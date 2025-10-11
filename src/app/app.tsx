@@ -148,8 +148,20 @@ export default function App() {
                                     return;
                                 }
 
+                                // ✅ Force switch to CELO network before sending the transaction
+                                try {
+                                    const { switchChain } = await import("wagmi/actions");
+                                    await switchChain(config, { chainId: 42220 }); // 42220 = CELO mainnet
+                                    console.log("✅ Switched to Celo network");
+                                } catch (err) {
+                                    console.error("⚠️ Failed to switch to Celo:", err);
+                                    // if user rejects network switch, stop the process
+                                    return;
+                                }
+
+                                // ✅ Use Celo USDC contract
                                 const recipient = "0xE51f63637c549244d0A8E11ac7E6C86a1E9E0670";
-                                const usdcContract = "0xcebA9300f2b948710d2653dD7B07f33A8B32118C";
+                                const usdcContract = "0xcebA9300f2b948710d2653dD7B07f33A8B32118C"; // CELO USDC
 
                                 const txData = encodeFunctionData({
                                     abi: [
@@ -173,9 +185,10 @@ export default function App() {
                                         to: usdcContract,
                                         data: txData,
                                         value: 0n,
+                                        chain: { id: 42220 }, // ✅ ensure it's broadcasted on CELO
                                     });
 
-                                    console.log("✅ Transaction sent:", txHash);
+                                    console.log("✅ Celo transaction sent:", txHash);
 
                                     iframeRef.current?.contentWindow?.postMessage(
                                         {
@@ -189,6 +202,7 @@ export default function App() {
                                     console.error("❌ Payment failed:", err);
                                 }
                                 break;
+
 
                             case "share-game":
                                 console.log("🎮 Unity requested to share game");
