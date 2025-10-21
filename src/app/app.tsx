@@ -6,7 +6,7 @@ import { ALLOWED_FIDS } from "../utils/AllowedFids";
 import { parseUnits } from "ethers";
 import { encodeFunctionData } from "viem";
 import { useAccount, useConfig } from "wagmi";
-import { getWalletClient } from "wagmi/actions";
+import { getWalletClient, switchChain } from "wagmi/actions";
 import { celo } from "wagmi/chains";
 
 
@@ -137,57 +137,46 @@ export default function App() {
                                     return;
                                 }
 
-                                let client;
                                 try {
-                                    client = await getWalletClient(config);
-                                } catch (e) {
-                                    console.error("❌ Wallet client fetch error:", e);
-                                    return;
-                                }
-
-                                if (!client) {
-                                    console.error("❌ Wallet client not available");
-                                    return;
-                                }
-
-                                // ✅ Force switch to CELO network before sending the transaction
-                                try {
-                                    const { switchChain } = await import("wagmi/actions");
-                                    await switchChain(config, { chainId: 42220 }); // 42220 = CELO mainnet
+                                    // Step 1️⃣ Switch to CELO first
+                                    await switchChain(config, { chainId: celo.id });
                                     console.log("✅ Switched to Celo network");
-                                } catch (err) {
-                                    console.error("⚠️ Failed to switch to Celo:", err);
-                                    // if user rejects network switch, stop the process
-                                    return;
-                                }
 
-                                // ✅ Use Celo USDC contract
-                                const recipient = "0xE51f63637c549244d0A8E11ac7E6C86a1E9E0670";
-                                const usdcContract = "0xcebA9300f2b948710d2653dD7B07f33A8B32118C"; // CELO USDC
+                                    // Step 2️⃣ Get a *new* wallet client AFTER switching
+                                    const client = await getWalletClient(config);
+                                    if (!client) {
+                                        console.error("❌ Wallet client not available after switch");
+                                        return;
+                                    }
 
-                                const txData = encodeFunctionData({
-                                    abi: [
-                                        {
-                                            name: "transfer",
-                                            type: "function",
-                                            stateMutability: "nonpayable",
-                                            inputs: [
-                                                { name: "to", type: "address" },
-                                                { name: "amount", type: "uint256" },
-                                            ],
-                                            outputs: [{ name: "", type: "bool" }],
-                                        },
-                                    ],
-                                    functionName: "transfer",
-                                    args: [recipient, parseUnits("1", 6)],
-                                });
+                                    // Step 3️⃣ Set recipient + USDC contract
+                                    const recipient = "0xE51f63637c549244d0A8E11ac7E6C86a1E9E0670";
+                                    const usdcContract = "0xcebA9300f2b948710d2653dD7B07f33A8B32118C"; // ✅ Celo USDC
 
-                                try {
+                                    // Step 4️⃣ Encode transfer data
+                                    const txData = encodeFunctionData({
+                                        abi: [
+                                            {
+                                                name: "transfer",
+                                                type: "function",
+                                                stateMutability: "nonpayable",
+                                                inputs: [
+                                                    { name: "to", type: "address" },
+                                                    { name: "amount", type: "uint256" },
+                                                ],
+                                                outputs: [{ name: "", type: "bool" }],
+                                            },
+                                        ],
+                                        functionName: "transfer",
+                                        args: [recipient, parseUnits("2", 6)], // ✅ 2 USDC
+                                    });
+
+                                    // Step 5️⃣ Send transaction (on CELO)
                                     const txHash = await client.sendTransaction({
                                         to: usdcContract,
                                         data: txData,
                                         value: 0n,
-                                        chain: celo, // ✅ ensure it's broadcasted on CELO
+                                        chain: celo, // ✅ tell wagmi we’re using Celo
                                     });
 
                                     console.log("✅ Celo transaction sent:", txHash);
