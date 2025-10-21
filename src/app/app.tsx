@@ -7,6 +7,8 @@ import { parseUnits } from "ethers";
 import { encodeFunctionData } from "viem";
 import { useAccount, useConfig } from "wagmi";
 import { getWalletClient } from "wagmi/actions";
+import { celo } from "wagmi/chains";
+
 
 type FarcasterUserInfo = {
     username: string;
@@ -185,7 +187,7 @@ export default function App() {
                                         to: usdcContract,
                                         data: txData,
                                         value: 0n,
-                                        chain: { id: 42220 }, // ✅ ensure it's broadcasted on CELO
+                                        chain: celo, // ✅ ensure it's broadcasted on CELO
                                     });
 
                                     console.log("✅ Celo transaction sent:", txHash);

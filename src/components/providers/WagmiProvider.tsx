@@ -1,7 +1,14 @@
 ﻿"use client";
 
 import { createConfig, http, WagmiProvider } from "wagmi";
-import { base, degen, mainnet, optimism, unichain, celo } from "wagmi/chains";
+import {
+    base,
+    degen,
+    mainnet,
+    optimism,
+    unichain,
+    celo as celoDefault,
+} from "wagmi/chains";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { farcasterFrame } from "@farcaster/frame-wagmi-connector";
 import { coinbaseWallet, metaMask } from "wagmi/connectors";
@@ -9,6 +16,30 @@ import { APP_NAME, APP_ICON_URL, APP_URL } from "~/lib/constants";
 import { useEffect, useState } from "react";
 import { useConnect, useAccount } from "wagmi";
 import React from "react";
+
+// ✅ Full Celo chain definition (explicit — ensures compatibility)
+const celo = {
+    ...celoDefault,
+    id: 42220,
+    name: "Celo Mainnet",
+    network: "celo",
+    nativeCurrency: {
+        decimals: 18,
+        name: "Celo",
+        symbol: "CELO",
+    },
+    rpcUrls: {
+        default: {
+            http: ["https://forno.celo.org"],
+        },
+        public: {
+            http: ["https://forno.celo.org"],
+        },
+    },
+    blockExplorers: {
+        default: { name: "CeloScan", url: "https://celoscan.io" },
+    },
+};
 
 // ✅ Wagmi + Celo config
 export const config = createConfig({
