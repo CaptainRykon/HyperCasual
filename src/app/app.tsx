@@ -151,7 +151,7 @@ export default function App() {
 
                                     // Step 3️⃣ Set recipient + USDC contract
                                     const recipient = "0xE51f63637c549244d0A8E11ac7E6C86a1E9E0670";
-                                    const usdcContract = "0xcebA9300f2b948710d2653dD7B07f33A8B32118C"; // ✅ Celo USDC
+                                    const usdcContract = "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913"; // ✅ Celo USDC
 
                                     // Step 4️⃣ Encode transfer data
                                     const txData = encodeFunctionData({
