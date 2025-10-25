@@ -142,16 +142,16 @@ export default function App() {
                                     await switchChain(config, { chainId: celo.id });
                                     console.log("✅ Switched to Celo network");
 
-                                    // Step 2️⃣ Get a *new* wallet client AFTER switching
+                                    // Step 2️⃣ Get wallet client after switching
                                     const client = await getWalletClient(config);
                                     if (!client) {
                                         console.error("❌ Wallet client not available after switch");
                                         return;
                                     }
 
-                                    // Step 3️⃣ Set recipient + USDC contract
+                                    // Step 3️⃣ Celo USDC contract (✅ Corrected)
                                     const recipient = "0xE51f63637c549244d0A8E11ac7E6C86a1E9E0670";
-                                    const usdcContract = "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913"; // ✅ Celo USDC
+                                    const usdcContract = "0xcebA9300f2b948710d2653dD7B07f33A8B32118C";
 
                                     // Step 4️⃣ Encode transfer data
                                     const txData = encodeFunctionData({
@@ -168,15 +168,15 @@ export default function App() {
                                             },
                                         ],
                                         functionName: "transfer",
-                                        args: [recipient, parseUnits("2", 6)], // ✅ 2 USDC
+                                        args: [recipient, parseUnits("1", 6)], // ✅ sending 1 USDC
                                     });
 
-                                    // Step 5️⃣ Send transaction (on CELO)
+                                    // Step 5️⃣ Send transaction
                                     const txHash = await client.sendTransaction({
                                         to: usdcContract,
                                         data: txData,
                                         value: 0n,
-                                        chain: celo, // ✅ tell wagmi we’re using Celo
+                                        chain: celo, // ✅ ensure transaction runs on Celo
                                     });
 
                                     console.log("✅ Celo transaction sent:", txHash);
@@ -193,6 +193,7 @@ export default function App() {
                                     console.error("❌ Payment failed:", err);
                                 }
                                 break;
+
 
 
                             case "share-game":
