@@ -4,9 +4,9 @@ import { useEffect, useRef } from "react";
 import sdk from "@farcaster/frame-sdk";
 import { ALLOWED_FIDS } from "../utils/AllowedFids";
 import { parseUnits } from "ethers";
-import { encodeFunctionData } from "viem";
+import {  } from "viem";
 import { useAccount, useConfig } from "wagmi";
-import { getWalletClient, switchChain } from "wagmi/actions";
+import {  switchChain } from "wagmi/actions";
 import { celo } from "wagmi/chains";
 
 
@@ -129,6 +129,8 @@ export default function App() {
                                 postToUnity();
                                 break;
 
+
+
                             case "request-payment":
                                 console.log("💸 Unity requested locked 1 USDC payment");
 
@@ -142,19 +144,15 @@ export default function App() {
                                     await switchChain(config, { chainId: celo.id });
                                     console.log("✅ Switched to Celo network");
 
-                                    // Step 2️⃣ Get wallet client after switching
-                                    const client = await getWalletClient(config);
-                                    if (!client) {
-                                        console.error("❌ Wallet client not available after switch");
-                                        return;
-                                    }
-
-                                    // Step 3️⃣ Celo USDC contract
+                                    // Step 2️⃣ Celo USDC contract details
                                     const recipient = "0xE51f63637c549244d0A8E11ac7E6C86a1E9E0670";
                                     const usdcContract = "0xcebA9300f2b948710d2653dD7B07f33A8B32118C"; // ✅ Celo USDC
 
-                                    // Step 4️⃣ Encode transfer data
-                                    const txData = encodeFunctionData({
+                                    // Step 3️⃣ Use writeContract instead of sendTransaction
+                                    const { writeContract, waitForTransactionReceipt } = await import("wagmi/actions");
+
+                                    const hash = await writeContract(config, {
+                                        address: usdcContract,
                                         abi: [
                                             {
                                                 name: "transfer",
@@ -169,26 +167,17 @@ export default function App() {
                                         ],
                                         functionName: "transfer",
                                         args: [recipient, parseUnits("1", 6)], // ✅ 1 USDC
-                                    });
-
-                                    // Step 5️⃣ Send transaction (explicit address + gas)
-                                    const txHash = await client.sendTransaction({
-                                        to: usdcContract,
-                                        data: txData,
-                                        value: 0n,
-                                        account: address, // ✅ explicitly define sender
                                         chain: celo,
-                                        gas: 150000n, // ✅ safe gas limit for USDC transfers on Celo
+                                        account: address,
                                     });
 
-                                    console.log("✅ Celo transaction sent:", txHash);
+                                    console.log("✅ Transaction submitted:", hash);
 
-                                    // ✅ Wait for confirmation before marking success
-                                    const { waitForTransactionReceipt } = await import("wagmi/actions");
-                                    const receipt = await waitForTransactionReceipt(config, { hash: txHash });
-
+                                    // Step 4️⃣ Wait for transaction confirmation
+                                    const receipt = await waitForTransactionReceipt(config, { hash });
                                     if (receipt.status === "success") {
-                                        console.log("🎉 Payment successful:", receipt.transactionHash);
+                                        console.log("🎉 Payment successful on Celo:", receipt.transactionHash);
+
                                         iframeRef.current?.contentWindow?.postMessage(
                                             {
                                                 type: "UNITY_METHOD_CALL",
@@ -204,6 +193,7 @@ export default function App() {
                                     console.error("❌ Payment failed:", err);
                                 }
                                 break;
+
 
 
 
