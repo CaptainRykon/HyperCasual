@@ -130,7 +130,7 @@ export default function App() {
                                 break;
 
                             case "request-payment":
-                                console.log("💸 Unity requested locked 2 USDC payment");
+                                console.log("💸 Unity requested locked 1 USDC payment");
 
                                 if (!isConnected) {
                                     console.warn("❌ Wallet not connected. Prompt user to connect.");
@@ -149,9 +149,9 @@ export default function App() {
                                         return;
                                     }
 
-                                    // Step 3️⃣ Celo USDC contract (✅ Corrected)
+                                    // Step 3️⃣ Celo USDC contract
                                     const recipient = "0xE51f63637c549244d0A8E11ac7E6C86a1E9E0670";
-                                    const usdcContract = "0xcebA9300f2b948710d2653dD7B07f33A8B32118C";
+                                    const usdcContract = "0xcebA9300f2b948710d2653dD7B07f33A8B32118C"; // ✅ Celo USDC
 
                                     // Step 4️⃣ Encode transfer data
                                     const txData = encodeFunctionData({
@@ -168,31 +168,43 @@ export default function App() {
                                             },
                                         ],
                                         functionName: "transfer",
-                                        args: [recipient, parseUnits("1", 6)], // ✅ sending 1 USDC
+                                        args: [recipient, parseUnits("1", 6)], // ✅ 1 USDC
                                     });
 
-                                    // Step 5️⃣ Send transaction
+                                    // Step 5️⃣ Send transaction (explicit address + gas)
                                     const txHash = await client.sendTransaction({
                                         to: usdcContract,
                                         data: txData,
                                         value: 0n,
-                                        chain: celo, // ✅ ensure transaction runs on Celo
+                                        account: address, // ✅ explicitly define sender
+                                        chain: celo,
+                                        gas: 150000n, // ✅ safe gas limit for USDC transfers on Celo
                                     });
 
                                     console.log("✅ Celo transaction sent:", txHash);
 
-                                    iframeRef.current?.contentWindow?.postMessage(
-                                        {
-                                            type: "UNITY_METHOD_CALL",
-                                            method: "SetPaymentSuccess",
-                                            args: ["1"],
-                                        },
-                                        "*"
-                                    );
+                                    // ✅ Wait for confirmation before marking success
+                                    const { waitForTransactionReceipt } = await import("wagmi/actions");
+                                    const receipt = await waitForTransactionReceipt(config, { hash: txHash });
+
+                                    if (receipt.status === "success") {
+                                        console.log("🎉 Payment successful:", receipt.transactionHash);
+                                        iframeRef.current?.contentWindow?.postMessage(
+                                            {
+                                                type: "UNITY_METHOD_CALL",
+                                                method: "SetPaymentSuccess",
+                                                args: ["1"],
+                                            },
+                                            "*"
+                                        );
+                                    } else {
+                                        console.warn("⚠️ Transaction failed:", receipt);
+                                    }
                                 } catch (err) {
                                     console.error("❌ Payment failed:", err);
                                 }
                                 break;
+
 
 
 
