@@ -4,8 +4,8 @@ import { useEffect, useRef } from "react";
 import sdk from "@farcaster/frame-sdk";
 import { ALLOWED_FIDS } from "../utils/AllowedFids";
 import { parseUnits } from "ethers";
-import {  } from "viem";
-import { useAccount, useConfig } from "wagmi";
+import { } from "viem";
+import { useAccount, useConfig, useConnect } from "wagmi";
 import { switchChain, getWalletClient } from "wagmi/actions";
 import { celo } from "wagmi/chains";
 
@@ -69,6 +69,33 @@ export default function App() {
 
     const { address, isConnected } = useAccount();
     const config = useConfig();
+    const { connect, connectors } = useConnect();
+
+    useEffect(() => {
+        const tryAutoConnect = async () => {
+            const ff = connectors.find((c) => c.id === "farcasterFrame");
+            if (!ff) {
+                console.warn("⚠️ Farcaster Frame connector not found in Wagmi config");
+                return;
+            }
+
+            // Check if already connected
+            if (isConnected && address) {
+                console.log("✅ Already connected to Farcaster wallet:", address);
+                return;
+            }
+
+            try {
+                console.log("🔌 Attempting to connect to Farcaster Frame...");
+                await connect({ connector: ff });
+                console.log("✅ Connected via Farcaster Frame connector");
+            } catch (e) {
+                console.error("❌ Failed to connect to Farcaster Frame:", e);
+            }
+        };
+
+        tryAutoConnect();
+    }, [connectors, connect, isConnected, address]);
 
     useEffect(() => {
         const init = async () => {
