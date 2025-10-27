@@ -6,7 +6,7 @@ import { ALLOWED_FIDS } from "../utils/AllowedFids";
 import { parseUnits } from "ethers";
 import {  } from "viem";
 import { useAccount, useConfig } from "wagmi";
-import {  switchChain } from "wagmi/actions";
+import { switchChain, getWalletClient } from "wagmi/actions";
 import { celo } from "wagmi/chains";
 
 
@@ -131,68 +131,83 @@ export default function App() {
 
 
 
+
+
+
+
+
                             case "request-payment":
                                 console.log("💸 Unity requested locked 1 USDC payment");
 
-                                if (!isConnected) {
-                                    console.warn("❌ Wallet not connected. Prompt user to connect.");
+                                // 0) quick sanity — address from useAccount()
+                                if (!address) {
+                                    console.warn("❌ No address (useAccount). Prompting user to connect via wagmi connector.");
+                                    // Optionally show UI or use connect auto-attempt (we added it above)
                                     return;
                                 }
 
                                 try {
-                                    // Step 1️⃣ Switch to CELO first
+                                    // 1) switch to CELO
                                     await switchChain(config, { chainId: celo.id });
                                     console.log("✅ Switched to Celo network");
 
-                                    // Step 2️⃣ Celo USDC contract details
+                                    // 2) ensure wallet client is available AFTER switch
+                                    let client;
+                                    try {
+                                        client = await getWalletClient(config);
+                                    } catch (e) {
+                                        console.warn("⚠️ getWalletClient failed — trying to prompt a connection:", e);
+                                        // If client isn't available, prompt user to connect using wagmi connectors.
+                                        // If you added the auto-connect effect above, user will get a prompt.
+                                        return;
+                                    }
+                                    if (!client) {
+                                        console.error("❌ Wallet client not available (after switch).");
+                                        return;
+                                    }
+
+                                    // 3) contract + args
                                     const recipient = "0xE51f63637c549244d0A8E11ac7E6C86a1E9E0670";
-                                    const usdcContract = "0xcebA9300f2b948710d2653dD7B07f33A8B32118C"; // ✅ Celo USDC
+                                    const usdcContract = "0xcebA9300f2b948710d2653dD7B07f33A8B32118C"; // CELO USDC
+                                    const amount = parseUnits("1", 6);
 
-                                    // Step 3️⃣ Use writeContract instead of sendTransaction
+                                    // 4) writeContract + wait
                                     const { writeContract, waitForTransactionReceipt } = await import("wagmi/actions");
-
-                                    const hash = await writeContract(config, {
+                                    const txHash = await writeContract(config, {
                                         address: usdcContract,
                                         abi: [
                                             {
                                                 name: "transfer",
                                                 type: "function",
                                                 stateMutability: "nonpayable",
-                                                inputs: [
-                                                    { name: "to", type: "address" },
-                                                    { name: "amount", type: "uint256" },
-                                                ],
+                                                inputs: [{ name: "to", type: "address" }, { name: "amount", type: "uint256" }],
                                                 outputs: [{ name: "", type: "bool" }],
                                             },
                                         ],
                                         functionName: "transfer",
-                                        args: [recipient, parseUnits("1", 6)], // ✅ 1 USDC
+                                        args: [recipient, amount],
                                         chain: celo,
                                         account: address,
                                     });
 
-                                    console.log("✅ Transaction submitted:", hash);
+                                    console.log("📤 txHash (submitted):", txHash);
+                                    const receipt = await waitForTransactionReceipt(config, { hash: txHash });
+                                    console.log("📣 tx receipt:", receipt);
 
-                                    // Step 4️⃣ Wait for transaction confirmation
-                                    const receipt = await waitForTransactionReceipt(config, { hash });
                                     if (receipt.status === "success") {
-                                        console.log("🎉 Payment successful on Celo:", receipt.transactionHash);
-
+                                        console.log("🎉 Payment successful:", receipt.transactionHash);
                                         iframeRef.current?.contentWindow?.postMessage(
-                                            {
-                                                type: "UNITY_METHOD_CALL",
-                                                method: "SetPaymentSuccess",
-                                                args: ["1"],
-                                            },
+                                            { type: "UNITY_METHOD_CALL", method: "SetPaymentSuccess", args: ["1"] },
                                             "*"
                                         );
                                     } else {
-                                        console.warn("⚠️ Transaction failed:", receipt);
+                                        console.warn("⚠️ Transaction failed or reverted:", receipt);
                                     }
                                 } catch (err) {
                                     console.error("❌ Payment failed:", err);
                                 }
                                 break;
+
 
 
 
