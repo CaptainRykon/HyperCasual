@@ -4,11 +4,9 @@ import { useEffect, useRef } from "react";
 import sdk from "@farcaster/frame-sdk";
 import { ALLOWED_FIDS } from "../utils/AllowedFids";
 import { parseUnits } from "ethers";
-import { } from "viem";
-import { useAccount, useConfig, useConnect } from "wagmi";
-import { switchChain, getWalletClient } from "wagmi/actions";
-import { celo } from "wagmi/chains";
-
+import { encodeFunctionData } from "viem";
+import { useAccount, useConfig } from "wagmi";
+import { getWalletClient } from "wagmi/actions";
 
 type FarcasterUserInfo = {
     username: string;
@@ -69,33 +67,6 @@ export default function App() {
 
     const { address, isConnected } = useAccount();
     const config = useConfig();
-    const { connect, connectors } = useConnect();
-
-    useEffect(() => {
-        const tryAutoConnect = async () => {
-            const ff = connectors.find((c) => c.id === "farcasterFrame");
-            if (!ff) {
-                console.warn("⚠️ Farcaster Frame connector not found in Wagmi config");
-                return;
-            }
-
-            // Check if already connected
-            if (isConnected && address) {
-                console.log("✅ Already connected to Farcaster wallet:", address);
-                return;
-            }
-
-            try {
-                console.log("🔌 Attempting to connect to Farcaster Frame...");
-                await connect({ connector: ff });
-                console.log("✅ Connected via Farcaster Frame connector");
-            } catch (e) {
-                console.error("❌ Failed to connect to Farcaster Frame:", e);
-            }
-        };
-
-        tryAutoConnect();
-    }, [connectors, connect, isConnected, address]);
 
     useEffect(() => {
         const init = async () => {
@@ -156,89 +127,68 @@ export default function App() {
                                 postToUnity();
                                 break;
 
-
-
-
-
-
-
-
                             case "request-payment":
-                                console.log("💸 Unity requested locked 1 USDC payment");
+                                console.log("💸 Unity requested locked 2 USDC payment");
 
-                                // 0) quick sanity — address from useAccount()
-                                if (!address) {
-                                    console.warn("❌ No address (useAccount). Prompting user to connect via wagmi connector.");
-                                    // Optionally show UI or use connect auto-attempt (we added it above)
+                                if (!isConnected) {
+                                    console.warn("❌ Wallet not connected. Prompt user to connect.");
                                     return;
                                 }
 
+                                let client;
                                 try {
-                                    // 1) switch to CELO
-                                    await switchChain(config, { chainId: celo.id });
-                                    console.log("✅ Switched to Celo network");
+                                    client = await getWalletClient(config);
+                                } catch (e) {
+                                    console.error("❌ Wallet client fetch error:", e);
+                                    return;
+                                }
 
-                                    // 2) ensure wallet client is available AFTER switch
-                                    let client;
-                                    try {
-                                        client = await getWalletClient(config);
-                                    } catch (e) {
-                                        console.warn("⚠️ getWalletClient failed — trying to prompt a connection:", e);
-                                        // If client isn't available, prompt user to connect using wagmi connectors.
-                                        // If you added the auto-connect effect above, user will get a prompt.
-                                        return;
-                                    }
-                                    if (!client) {
-                                        console.error("❌ Wallet client not available (after switch).");
-                                        return;
-                                    }
+                                if (!client) {
+                                    console.error("❌ Wallet client not available");
+                                    return;
+                                }
 
-                                    // 3) contract + args
-                                    const recipient = "0xE51f63637c549244d0A8E11ac7E6C86a1E9E0670";
-                                    const usdcContract = "0xcebA9300f2b948710d2653dD7B07f33A8B32118C"; // CELO USDC
-                                    const amount = parseUnits("1", 6);
+                                const recipient = "0xE51f63637c549244d0A8E11ac7E6C86a1E9E0670";
+                                const usdcContract = "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913";
 
-                                    // 4) writeContract + wait
-                                    const { writeContract, waitForTransactionReceipt } = await import("wagmi/actions");
-                                    const txHash = await writeContract(config, {
-                                        address: usdcContract,
-                                        abi: [
-                                            {
-                                                name: "transfer",
-                                                type: "function",
-                                                stateMutability: "nonpayable",
-                                                inputs: [{ name: "to", type: "address" }, { name: "amount", type: "uint256" }],
-                                                outputs: [{ name: "", type: "bool" }],
-                                            },
-                                        ],
-                                        functionName: "transfer",
-                                        args: [recipient, amount],
-                                        chain: celo,
-                                        account: address,
+                                const txData = encodeFunctionData({
+                                    abi: [
+                                        {
+                                            name: "transfer",
+                                            type: "function",
+                                            stateMutability: "nonpayable",
+                                            inputs: [
+                                                { name: "to", type: "address" },
+                                                { name: "amount", type: "uint256" },
+                                            ],
+                                            outputs: [{ name: "", type: "bool" }],
+                                        },
+                                    ],
+                                    functionName: "transfer",
+                                    args: [recipient, parseUnits("1", 6)],
+                                });
+
+                                try {
+                                    const txHash = await client.sendTransaction({
+                                        to: usdcContract,
+                                        data: txData,
+                                        value: 0n,
                                     });
 
-                                    console.log("📤 txHash (submitted):", txHash);
-                                    const receipt = await waitForTransactionReceipt(config, { hash: txHash });
-                                    console.log("📣 tx receipt:", receipt);
+                                    console.log("✅ Transaction sent:", txHash);
 
-                                    if (receipt.status === "success") {
-                                        console.log("🎉 Payment successful:", receipt.transactionHash);
-                                        iframeRef.current?.contentWindow?.postMessage(
-                                            { type: "UNITY_METHOD_CALL", method: "SetPaymentSuccess", args: ["1"] },
-                                            "*"
-                                        );
-                                    } else {
-                                        console.warn("⚠️ Transaction failed or reverted:", receipt);
-                                    }
+                                    iframeRef.current?.contentWindow?.postMessage(
+                                        {
+                                            type: "UNITY_METHOD_CALL",
+                                            method: "SetPaymentSuccess",
+                                            args: ["1"],
+                                        },
+                                        "*"
+                                    );
                                 } catch (err) {
                                     console.error("❌ Payment failed:", err);
                                 }
                                 break;
-
-
-
-
-
 
                             case "share-game":
                                 console.log("🎮 Unity requested to share game");
